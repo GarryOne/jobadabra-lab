@@ -3,6 +3,7 @@ Run: python3 -m unittest discover -s tests"""
 import datetime
 import sys
 import tempfile
+import json
 import unittest
 from pathlib import Path
 
@@ -65,3 +66,36 @@ class LicenseTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SyncTest(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.saved = lic.DATA
+        lic.DATA = Path(self.folder.name)
+        self.addCleanup(lambda: setattr(lic, "DATA", self.saved))
+        lic.save("notion.json", {"licenses_database": "db"})
+        self.key = Ed25519PrivateKey.generate()
+
+    def test_each_key_becomes_one_row_updated_in_place_never_with_the_key(self):
+        key = lic.mint(self.key, "Ana", "founder")
+        item = lic.load(lic.LEDGER, [])[0]
+        rows, calls = {}, []
+        def notion(path, method="GET", body=None):
+            calls.append((path, method, body))
+            if path.endswith("/query"):
+                wanted = body["filter"]["rich_text"]["equals"]
+                return {"results": [{"id": rows[wanted]}] if wanted in rows else []}
+            if path == "pages":
+                rows[item["id"]] = "page-1"
+            return {}
+        seen = {item["id"]: {"lastSeen": "2026-09-30T08:00:00Z", "version": "0.4.0-alpha.75"}}
+        self.assertEqual(lic.sync(notion, seen), 1)
+        self.assertEqual(lic.sync(notion, {}), 1)
+        created = [c for c in calls if c[0] == "pages"][0][2]["properties"]
+        self.assertEqual(created["Status"]["select"]["name"], "Active")
+        self.assertEqual(created["Last seen"]["date"]["start"], "2026-09-30")
+        updated = [c for c in calls if c[0] == "pages/page-1"][0][2]["properties"]
+        self.assertNotIn("Last seen", updated)  # no report since: the old date stays
+        self.assertNotIn(key.split(".")[2], json.dumps(calls))

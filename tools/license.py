@@ -7,6 +7,7 @@
   tools/license.py show <id or name>                       print a key again (the same key: signatures are deterministic)
   tools/license.py revoke <id>                             writes data/revocations.json (signed) for the app to fetch later
   tools/license.py verify <key>
+  tools/license.py sync                                    Notion 🔑 Licenses: every key, status, and when its app was last seen
 
 Key format: JP1.<base64url payload>.<base64url signature>, payload {id, name, kind: founder|friend|pass, until?}.
 The private key lives ONLY in the macOS Keychain (job-pilotto.license.signing_key): never in git, Notion or logs.
@@ -19,6 +20,8 @@ import json
 import secrets
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
@@ -94,6 +97,75 @@ def show(key: Ed25519PrivateKey, who: str) -> list[tuple[dict, str]]:
     return [(item, sign_payload(key, {k: item[k] for k in ('id', 'name', 'kind', 'until') if k in item})) for item in found]
 
 
+# ---- Notion 🔑 Licenses (Project Hub → Users & Launch): one row per key, never the key itself ----
+# Written with the Job Pilotto Brain connection (Keychain job-pilotto.notion.brain_token); "Last seen" comes from the
+# apps' daily health lines (the website's /api/signals, key job-pilotto.site.stats_key), which carry only the id.
+SIGNALS = "https://www.jobpilotto.workers.dev/api/signals?days=30"
+
+
+def keychain(service: str) -> str:
+    return subprocess.run(["security", "find-generic-password", "-s", service, "-w"], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def http(url: str, method: str = "GET", body: dict | None = None, headers: dict | None = None) -> dict:
+    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, method=method,
+                                 headers={"Content-Type": "application/json", "User-Agent": "job-pilotto-license", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return json.loads(response.read() or b"{}")
+
+
+def notion_api(path: str, method: str = "GET", body: dict | None = None) -> dict:
+    return http(f"https://api.notion.com/v1/{path}", method, body,
+                {"Authorization": f"Bearer {keychain('job-pilotto.notion.brain_token')}", "Notion-Version": "2022-06-28"})
+
+
+def seen_by_id() -> dict:
+    try:
+        return http(SIGNALS, headers={"Authorization": f"Bearer {keychain('job-pilotto.site.stats_key')}"}).get("licenses", {})
+    except (urllib.error.URLError, subprocess.CalledProcessError, OSError) as error:
+        print(f"(Last seen not updated: {error})", file=sys.stderr)
+        return {}
+
+
+def row_properties(item: dict, revoked: set, seen: dict) -> dict:
+    text = lambda value: {"rich_text": [{"type": "text", "text": {"content": value}}] if value else []}
+    date = lambda value: {"date": {"start": value[:10]} if value else None}
+    props = {"Name": {"title": [{"type": "text", "text": {"content": item["name"]}}]}, "License id": text(item["id"]),
+             "Kind": {"select": {"name": item["kind"]}}, "Status": {"select": {"name": "Revoked" if item["id"] in revoked else "Active"}},
+             "Minted": date(item.get("minted")), "Until": date(item.get("until"))}
+    if item["id"] in seen:  # only set when the app reported it; never erase an older "Last seen"
+        props["Last seen"] = date(seen[item["id"]].get("lastSeen"))
+        props["Version"] = text(seen[item["id"]].get("version", ""))
+    return props
+
+
+def sync(notion=notion_api, seen: dict | None = None) -> int:
+    """Every minted key -> one row in Notion 🔑 Licenses (matched by License id). Returns how many rows were written."""
+    database = load("notion.json", {}).get("licenses_database")
+    if not database:
+        raise SystemExit("data/notion.json has no licenses_database")
+    revoked = set(load(REVOCATIONS, {}).get("revoked", []))
+    seen = seen_by_id() if seen is None else seen
+    written = 0
+    for item in load(LEDGER, []):
+        found = notion(f"databases/{database}/query", "POST",
+                       {"filter": {"property": "License id", "rich_text": {"equals": item["id"]}}, "page_size": 1}).get("results", [])
+        props = row_properties(item, revoked, seen)
+        if found:
+            notion(f"pages/{found[0]['id']}", "PATCH", {"properties": props})
+        else:
+            notion("pages", "POST", {"parent": {"database_id": database}, "properties": props})
+        written += 1
+    return written
+
+
+def try_sync() -> None:
+    try:
+        print(f"Notion 🔑 Licenses: {sync()} rows up to date")
+    except Exception as error:  # the key is minted either way; syncing can be re-run with `sync`
+        print(f"(Notion not updated: {error}. Run: tools/license.py sync)", file=sys.stderr)
+
+
 def mint(key: Ed25519PrivateKey, name: str, kind: str, until: str | None = None, today: datetime.date | None = None) -> str:
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
@@ -129,6 +201,7 @@ def main(argv=None) -> None:
     m.add_argument("--kind", required=True, choices=KINDS)
     m.add_argument("--until", help="YYYY-MM-DD; omit for no end date")
     sub.add_parser("list")
+    sub.add_parser("sync")
     w = sub.add_parser("show")
     w.add_argument("who", help="a license id or (part of) a name")
     r = sub.add_parser("revoke")
@@ -148,12 +221,15 @@ def main(argv=None) -> None:
             print(mint(private_key(), args.name, args.kind, args.until))
         except ValueError as error:
             sys.exit(str(error))
+        try_sync()
     elif args.command == "show":
         found = show(private_key(), args.who)
         if not found:
             raise SystemExit(f"No license for {args.who!r}: see tools/license.py list")
         for item, text in found:
             print(f"{item['name']} ({item['kind']}, id {item['id']}):\n{text}\n")
+    elif args.command == "sync":
+        print(f"Notion 🔑 Licenses: {sync()} rows up to date")
     elif args.command == "list":
         revoked = set(load(REVOCATIONS, {}).get("revoked", []))
         for item in load(LEDGER, []):
@@ -164,6 +240,7 @@ def main(argv=None) -> None:
         except ValueError as error:
             sys.exit(str(error))
         print(f"Revoked {args.id}. Signed list: data/revocations.json")
+        try_sync()
     elif args.command == "verify":
         try:
             print(json.dumps(verify(args.key, public_b64(private_key())), ensure_ascii=False))
