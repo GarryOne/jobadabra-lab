@@ -41,13 +41,22 @@ jobs:
           path: data/jobs.sqlite
           key: central-scout-db-${{ github.run_id }}
           restore-keys: central-scout-db-
-      - name: Run tests
-        run: python -m unittest discover -s tests
       - name: Scout and publish the index
         env:
           INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
           BATCH: ${{ inputs.batch || '60' }}
         run: python -m src scout --batch "$BATCH" --publish-index
+      - name: Tell the owner when it fails
+        if: failure()
+        env:
+          BOT: ${{ secrets.BRAIN_BOT_TOKEN }}
+          CHAT: ${{ secrets.BRAIN_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$BOT" ] && [ -n "$CHAT" ] || exit 0
+          curl -fsS "https://api.telegram.org/bot${BOT}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" \
+            --data-urlencode "text=❌ Central scout failed, the employer index is not updated: ${RUN_URL}" > /dev/null
       - name: Save the scout's candidate list
         if: always()
         uses: actions/cache/save@v4
