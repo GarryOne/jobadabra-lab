@@ -10,7 +10,7 @@ on:
     - cron: '20 4 * * *'   # UTC, before the users' morning runs
   workflow_dispatch:
     inputs:
-      batch: {description: 'candidates to probe this run', required: false, default: '60'}
+      batch: {description: 'candidates to probe this run', required: false, default: '120'}
 
 permissions:
   contents: read
@@ -22,6 +22,8 @@ concurrency:
 env:
   # No user is behind this run: nothing of Notion, Telegram or the AI can start, even if a variable leaks in.
   JOB_PILOTTO_DISABLE: notion,telegram,mail,google_jobs,enrich,score,auto_kits,insights,index
+  # Worldwide places (not one user's search): the index serves users everywhere; each app filters by its own search.
+  JOB_PILOTTO_LOCATIONS_FILE: config/central_locations.json
 
 jobs:
   scout:
@@ -44,7 +46,7 @@ jobs:
       - name: Scout and publish the index
         env:
           INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
-          BATCH: ${{ inputs.batch || '60' }}
+          BATCH: ${{ inputs.batch || '120' }}
         run: python -m src scout --batch "$BATCH" --publish-index
       - name: Tell the owner when it fails
         if: failure()
