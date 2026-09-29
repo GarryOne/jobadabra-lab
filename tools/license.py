@@ -166,6 +166,10 @@ def try_sync() -> None:
         print(f"(Notion not updated: {error}. Run: tools/license.py sync)", file=sys.stderr)
 
 
+def install_line(key: str) -> str:
+    return f"curl -fsSL https://www.jobpilotto.workers.dev/install | bash -s {key}"
+
+
 def mint(key: Ed25519PrivateKey, name: str, kind: str, until: str | None = None, today: datetime.date | None = None) -> str:
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
@@ -218,16 +222,18 @@ def main(argv=None) -> None:
         print(f"Signing key stored in the Keychain as {SERVICE}.\nPublic key (goes into desktop/lib/license.js): {public_b64(seed)}")
     elif args.command == "mint":
         try:
-            print(mint(private_key(), args.name, args.kind, args.until))
+            key = mint(private_key(), args.name, args.kind, args.until)
         except ValueError as error:
             sys.exit(str(error))
+        print(key)
+        print(f"\nSend this (Mac, one line: installs, unlocks, \$1 free AI):\n{install_line(key)}")
         try_sync()
     elif args.command == "show":
         found = show(private_key(), args.who)
         if not found:
             raise SystemExit(f"No license for {args.who!r}: see tools/license.py list")
         for item, text in found:
-            print(f"{item['name']} ({item['kind']}, id {item['id']}):\n{text}\n")
+            print(f"{item['name']} ({item['kind']}, id {item['id']}):\n{text}\nInstall line: {install_line(text)}\n")
     elif args.command == "sync":
         print(f"Notion 🔑 Licenses: {sync()} rows up to date")
     elif args.command == "list":
