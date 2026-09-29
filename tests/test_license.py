@@ -48,6 +48,13 @@ class LicenseTest(unittest.TestCase):
         self.assertEqual([item["name"] for item in ledger], ["Ana"])
         self.assertNotIn(key, str(ledger))
 
+    def test_show_gives_back_the_exact_same_key_by_id_or_name(self):
+        key = lic.mint(self.key, "Ana Popescu", "founder", until="2027-01-01")
+        item = lic.load(lic.LEDGER, [])[0]
+        self.assertEqual(lic.show(self.key, item["id"])[0][1], key)
+        self.assertEqual(lic.show(self.key, "ana")[0][1], key)
+        self.assertEqual(lic.show(self.key, "nobody"), [])
+
     def test_revoke_signs_a_list_and_rejects_unknown_ids(self):
         payload = lic.verify(lic.mint(self.key, "Ana", "friend"), self.public)
         signed = lic.revoke(self.key, payload["id"], today=datetime.date(2026, 10, 1))

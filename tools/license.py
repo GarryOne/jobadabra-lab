@@ -3,7 +3,8 @@
 
   tools/license.py init                                    one time: make the signing key (Keychain only), print the public key
   tools/license.py mint --name "Ana" --kind friend [--until 2027-01-01]
-  tools/license.py list
+  tools/license.py list                                    who got which key (no keys shown)
+  tools/license.py show <id or name>                       print a key again (the same key: signatures are deterministic)
   tools/license.py revoke <id>                             writes data/revocations.json (signed) for the app to fetch later
   tools/license.py verify <key>
 
@@ -87,6 +88,12 @@ def save(name: str, value) -> None:
     (DATA / name).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
 
+def show(key: Ed25519PrivateKey, who: str) -> list[tuple[dict, str]]:
+    """The keys already minted for an id or a name (case-insensitive): re-signed, so identical to the originals."""
+    found = [item for item in load(LEDGER, []) if who == item['id'] or who.lower() in item['name'].lower()]
+    return [(item, sign_payload(key, {k: item[k] for k in ('id', 'name', 'kind', 'until') if k in item})) for item in found]
+
+
 def mint(key: Ed25519PrivateKey, name: str, kind: str, until: str | None = None, today: datetime.date | None = None) -> str:
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
@@ -122,6 +129,8 @@ def main(argv=None) -> None:
     m.add_argument("--kind", required=True, choices=KINDS)
     m.add_argument("--until", help="YYYY-MM-DD; omit for no end date")
     sub.add_parser("list")
+    w = sub.add_parser("show")
+    w.add_argument("who", help="a license id or (part of) a name")
     r = sub.add_parser("revoke")
     r.add_argument("id")
     v = sub.add_parser("verify")
@@ -139,6 +148,12 @@ def main(argv=None) -> None:
             print(mint(private_key(), args.name, args.kind, args.until))
         except ValueError as error:
             sys.exit(str(error))
+    elif args.command == "show":
+        found = show(private_key(), args.who)
+        if not found:
+            raise SystemExit(f"No license for {args.who!r}: see tools/license.py list")
+        for item, text in found:
+            print(f"{item['name']} ({item['kind']}, id {item['id']}):\n{text}\n")
     elif args.command == "list":
         revoked = set(load(REVOCATIONS, {}).get("revoked", []))
         for item in load(LEDGER, []):
