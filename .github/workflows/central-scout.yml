@@ -34,6 +34,13 @@ jobs:
         with:
           repository: GarryOne/job-pilotto
           ref: main
+      - name: This private repo (the curated seed lists)
+        uses: actions/checkout@v4
+        with:
+          path: ops
+          sparse-checkout: config
+      - name: Load the private seed lists
+        run: cp ops/config/scout_seeds.json config/scout_seeds.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
