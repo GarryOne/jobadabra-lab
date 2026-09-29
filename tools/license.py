@@ -226,7 +226,7 @@ def main(argv=None) -> None:
         except ValueError as error:
             sys.exit(str(error))
         print(key)
-        print(f"\nSend this (Mac, one line: installs, unlocks, \$1 free AI):\n{install_line(key)}")
+        print(f"\nSend this (Mac, one line: installs, unlocks, $1 free AI):\n{install_line(key)}")
         try_sync()
     elif args.command == "show":
         found = show(private_key(), args.who)
