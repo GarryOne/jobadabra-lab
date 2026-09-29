@@ -1,0 +1,56 @@
+# Job Pilotto — the central scout. Runs the PUBLIC engine's source scout once a day with no user's data (no Notion,
+# no Telegram, no AI), verifies every known feed and uploads the employer index to the website worker
+# (PUT https://www.jobpilotto.workers.dev/api/index). Apps and Always-on runs download it (GET /api/index).
+# Secret: INDEX_PUBLISH_KEY (= the website worker's secret of the same name; Keychain job-pilotto.site.index_publish_key).
+name: Central scout
+run-name: central scout${{ inputs.batch && format(' {0}', inputs.batch) || '' }}
+
+on:
+  schedule:
+    - cron: '20 4 * * *'   # UTC, before the users' morning runs
+  workflow_dispatch:
+    inputs:
+      batch: {description: 'candidates to probe this run', required: false, default: '60'}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: central-scout
+  cancel-in-progress: false
+
+env:
+  # No user is behind this run: nothing of Notion, Telegram or the AI can start, even if a variable leaks in.
+  JOB_PILOTTO_DISABLE: notion,telegram,mail,google_jobs,enrich,score,auto_kits,insights,index
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore the scout's candidate list
+        uses: actions/cache/restore@v4
+        with:
+          path: data/jobs.sqlite
+          key: central-scout-db-${{ github.run_id }}
+          restore-keys: central-scout-db-
+      - name: Run tests
+        run: python -m unittest discover -s tests
+      - name: Scout and publish the index
+        env:
+          INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
+          BATCH: ${{ inputs.batch || '60' }}
+        run: python -m src scout --batch "$BATCH" --publish-index
+      - name: Save the scout's candidate list
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/jobs.sqlite
+          key: central-scout-db-${{ github.run_id }}
