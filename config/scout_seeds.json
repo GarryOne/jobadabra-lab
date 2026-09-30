@@ -520,5 +520,11 @@
       "Fawry",
       "Instabug"
     ]
-  }
+  },
+  "boards": [
+    {
+      "ats": "ashby",
+      "slug": "Pear-VC"
+    }
+  ]
 }
