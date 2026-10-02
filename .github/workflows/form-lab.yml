@@ -1,0 +1,58 @@
+name: Form lab
+# A daily headless browser runs the extension's real operators on PUBLIC application forms with a test applicant that never
+# submits (lab/form-lab.mjs), and reports what worked to the site (POST /api/lab): the success rate per board and kind of control,
+# measured before any user hits a failure. Pages are chosen from the site's plan (/api/lab/plan): revisits of failing or unproven
+# controls first, then the boards users fill most, with a small share of random exploration. It also tries the site's candidate
+# recipes and gives one a small canary when it works on enough different pages.
+# Lives in this private repo because it is the method of the product's intelligence. It checks out the public repo (employer
+# index, board adapters) and the private extension repo (the operators, with a read-only deploy key).
+# Secrets: LAB_KEY (the site's STATS_KEY), EXTENSION_DEPLOY_KEY (read-only key of GarryOne/job-pilotto-extension).
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+    inputs:
+      feeds: {description: 'How many forms to visit', required: false, default: '25'}
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      LAB_KEY: ${{ secrets.LAB_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto
+          path: public
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto-extension
+          ssh-key: ${{ secrets.EXTENSION_DEPLOY_KEY }}
+          path: extension
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install
+        run: |
+          pip install -r public/requirements.txt
+          npm install --no-save --no-audit --no-fund playwright-core
+          npx playwright-core install --with-deps chromium
+      - name: The lab's own tests
+        run: |
+          node --test lab/form-lab-lib.test.mjs
+          python3 -m unittest tests.test_form_lab_urls
+      - name: Where the lab should look (the site's plan, busiest boards and failing or unproven controls)
+        run: |
+          curl -fsS -H "Authorization: Bearer $LAB_KEY" https://www.jobpilotto.workers.dev/api/lab/plan -o plan.json || echo '{}' > plan.json
+      - name: Public application forms to visit
+        run: python3 lab/form_lab_urls.py --feeds "${{ github.event.inputs.feeds || '25' }}" --plan plan.json --engine public > urls.txt
+      - name: Run the lab
+        run: node lab/form-lab.mjs --urls urls.txt --max "${{ github.event.inputs.feeds || '25' }}" --promote --extension extension --out lab-result.json
+      - uses: actions/upload-artifact@v4
+        with: {name: lab-result, path: lab-result.json, retention-days: 14}
