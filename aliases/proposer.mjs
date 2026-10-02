@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {MODEL, SYSTEM, VERIFY, askMessage, costUsd, decide, parseJson, verifyMessage} from './aliases-lib.mjs';
+import {BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, parseJson, verifyMessage} from './aliases-lib.mjs';
 
 const SITE = 'https://www.jobpilotto.workers.dev';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
@@ -27,37 +27,57 @@ async function ask(fetcher, apiKey, system, content) {
 
 export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3, dry = false, schema, fetcher = fetch}) {
   const owner = {Authorization: `Bearer ${ownerKey}`, 'content-type': 'application/json'};
-  const listed = await fetcher(`${site}/api/aliases?targets=1`, {headers: owner});
-  if (!listed.ok) throw new Error(`targets: HTTP ${listed.status}`);
-  const {targets = [], sensitive = []} = await listed.json();
+  const list = async mode => {
+    const listed = await fetcher(`${site}/api/aliases?targets=${mode}`, {headers: owner});
+    if (!listed.ok) throw new Error(`targets: HTTP ${listed.status}`);
+    return listed.json();
+  };
+  const questions = await list('1'), buttons = await list('buttons');
   const summary = {considered: 0, canary: 0, candidate: 0, skipped: 0, spent: 0, results: []};
-  log(`${targets.length} question(s) without a meaning, budget $${budget}${dry ? ' (dry: nothing is filed)' : ''}`);
-  for (const target of targets.slice(0, max)) {
+  const reviewed = [];
+  log(`${questions.targets?.length || 0} question(s) and ${buttons.targets?.length || 0} button text(s) without a meaning, budget $${budget}${dry ? ' (dry: nothing is filed)' : ''}`);
+  const work = [...(questions.targets || []).map(target => ({target, kind: 'question'})), ...(buttons.targets || []).map(target => ({target, kind: 'button'}))].slice(0, max);
+  for (const {target, kind} of work) {
     if (summary.spent >= budget) { log(`budget reached at $${summary.spent.toFixed(4)}: stopping`); break; }
     summary.considered++;
     let decision, cost = 0;
     try {
-      const first = await ask(fetcher, apiKey, SYSTEM, askMessage(target));
-      cost += costUsd(first.usage);
-      const proposal = parseJson(first.text);
-      let verdict = null;
-      if (proposal && !proposal.none && proposal.key) {
-        const second = await ask(fetcher, apiKey, VERIFY, verifyMessage(target, proposal.key));
-        cost += costUsd(second.usage);
-        verdict = parseJson(second.text);
+      if (kind === 'button') {
+        const first = await ask(fetcher, apiKey, BUTTON_SYSTEM, buttonMessage(target));
+        cost += costUsd(first.usage);
+        const proposal = parseJson(first.text);
+        let verdict = null;
+        if (proposal?.apply === true) {
+          const second = await ask(fetcher, apiKey, BUTTON_VERIFY, buttonMessage(target));
+          cost += costUsd(second.usage);
+          verdict = parseJson(second.text);
+        }
+        decision = decideButton({target, proposal, verdict, validateAlias: schema.validateAlias});
+      } else {
+        const first = await ask(fetcher, apiKey, SYSTEM, askMessage(target));
+        cost += costUsd(first.usage);
+        const proposal = parseJson(first.text);
+        let verdict = null;
+        if (proposal && !proposal.none && proposal.key) {
+          const second = await ask(fetcher, apiKey, VERIFY, verifyMessage(target, proposal.key));
+          cost += costUsd(second.usage);
+          verdict = parseJson(second.text);
+        }
+        decision = decide({target, proposal, verdict, sensitive: questions.sensitive || [], validateAlias: schema.validateAlias, aliasKey: schema.aliasKey});
       }
-      decision = decide({target, proposal, verdict, sensitive, validateAlias: schema.validateAlias, aliasKey: schema.aliasKey});
     } catch (error) { decision = {action: 'skip', why: `error: ${error.message}`}; }
     summary.spent += cost;
+    if (decision.action === 'skip' && /^(model:|invalid alias|the phrase is not)/.test(decision.why || '')) reviewed.push({label: target.label});   // not looked at again for a month
     if (decision.alias && !dry) {
       const put = await fetcher(`${site}/api/aliases`, {method: 'PUT', headers: owner, body: JSON.stringify({items: [decision.alias], source: 'proposer',
         status: decision.action === 'canary' ? 'canary' : 'candidate', rollout: 5, note: (decision.why || `${target.installs} installs, ${target.n} times`).slice(0, 150)})});
       if (!put.ok) decision = {action: 'skip', why: `site refused: HTTP ${put.status}`};
     }
     summary[decision.action === 'skip' ? 'skipped' : decision.action]++;
-    summary.results.push({label: target.label, installs: target.installs, action: decision.action, ...(decision.alias ? {alias: decision.alias} : {}), ...(decision.why ? {why: decision.why} : {}), cost: Number(cost.toFixed(5))});
-    log(`"${target.label}"`, `${target.installs} installs`, decision.action, decision.alias ? `${decision.alias.key} <- "${decision.alias.phrase}"` : `(${decision.why})`, `$${cost.toFixed(5)}`);
+    summary.results.push({kind, label: target.label, installs: target.installs, action: decision.action, ...(decision.alias ? {alias: decision.alias} : {}), ...(decision.why ? {why: decision.why} : {}), cost: Number(cost.toFixed(5))});
+    log(kind, `"${target.label}"`, `${target.installs} installs`, decision.action, decision.alias ? `${decision.alias.key} <- "${decision.alias.phrase}"` : `(${decision.why})`, `$${cost.toFixed(5)}`);
   }
+  if (reviewed.length && !dry) await fetcher(`${site}/api/aliases`, {method: 'PUT', headers: owner, body: JSON.stringify({reviewed})}).catch(() => {});
   log(`done: ${summary.canary} canary, ${summary.candidate} candidate, ${summary.skipped} skipped, $${summary.spent.toFixed(4)} spent`);
   return summary;
 }
