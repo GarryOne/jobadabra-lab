@@ -1,0 +1,29 @@
+name: Triage
+# Daily: pull the problems that recur from the website's queue (a failure reported by several installs, or very often; the daily top
+# problems) and file them as issues in this private repository (triage/triage.py). One issue per problem, updated when it comes back.
+# Replaces the public repo's intake, triage and auto-fix workflows: nothing about which sites or fields fail is published, and
+# learned form knowledge becomes recipes (the site's database), not code.
+# Secret: LAB_KEY (the site's owner key).
+on:
+  schedule:
+    - cron: '47 5 * * *'
+  workflow_dispatch:
+    inputs:
+      dry: {description: 'Only print what would be filed', required: false, default: 'false'}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LAB_KEY: ${{ secrets.LAB_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest tests.test_triage
+      - name: Pull and file
+        run: python3 triage/triage.py ${{ github.event.inputs.dry == 'true' && '--dry' || '' }}
