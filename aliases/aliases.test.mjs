@@ -47,11 +47,12 @@ test('the prompts treat the wording as data and list the same fields the extensi
   assert.equal(parseJson('no json'), null);
 });
 
-function network(replies, targets, buttonTargets = []) {
+function network(replies, targets, buttonTargets = [], fixTargets = []) {
   const calls = {put: [], model: 0};
   const fetcher = async (url, init = {}) => {
     const json = body => ({ok: true, status: 200, json: async () => body});
     if (url.includes('/api/aliases?targets=1')) return json({targets, sensitive: SENSITIVE});
+    if (url.includes('/api/aliases?targets=fixes')) return json({targets: fixTargets, sensitive: SENSITIVE});
     if (url.includes('/api/aliases?targets=buttons')) return json({targets: buttonTargets, sensitive: []});
     if (url.includes('/api/aliases')) { calls.put.push(JSON.parse(init.body)); return json({ok: true, stored: 1}); }
     const text = replies[Math.min(calls.model++, replies.length - 1)];
@@ -120,4 +121,14 @@ test('a run handles questions and buttons together, files the meaning and record
   const filed = calls.put.filter(p => p.items);
   assert.deepEqual(filed.map(p => [p.items[0].key, p.status]), [['location', 'canary'], ['apply_button', 'canary']]);
   assert.deepEqual(calls.put.find(p => p.reviewed).reviewed, [{label: 'search jobs'}]);
+});
+
+test('an answer people keep changing is filed only as a candidate, and skipped when the model agrees with the current meaning', async () => {
+  const replies = [JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}', JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}'];
+  const fixes = [target({label: 'ville de résidence', n: 30, corrected: 14, current: ''}), target({label: 'ville de résidence', n: 30, corrected: 14, current: 'location'})];
+  const {fetcher, calls} = network(replies, [], [], fixes);
+  const summary = await run({ownerKey: 'k', apiKey: 'a', schema, fetcher});
+  assert.deepEqual([summary.canary, summary.candidate, summary.skipped], [0, 1, 1]);
+  assert.match(calls.put[0].note, /14 of 30 fills were changed by hand/);
+  assert.equal(calls.put[0].status, 'candidate');
 });

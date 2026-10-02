@@ -32,12 +32,13 @@ export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3
     if (!listed.ok) throw new Error(`targets: HTTP ${listed.status}`);
     return listed.json();
   };
-  const questions = await list('1'), buttons = await list('buttons');
+  const questions = await list('1'), buttons = await list('buttons'), fixes = await list('fixes').catch(() => ({targets: []}));
   const summary = {considered: 0, canary: 0, candidate: 0, skipped: 0, spent: 0, results: []};
   const reviewed = [];
-  log(`${questions.targets?.length || 0} question(s) and ${buttons.targets?.length || 0} button text(s) without a meaning, budget $${budget}${dry ? ' (dry: nothing is filed)' : ''}`);
-  const work = [...(questions.targets || []).map(target => ({target, kind: 'question'})), ...(buttons.targets || []).map(target => ({target, kind: 'button'}))].slice(0, max);
-  for (const {target, kind} of work) {
+  log(`${questions.targets?.length || 0} question(s) and ${buttons.targets?.length || 0} button text(s) without a meaning, ${fixes.targets?.length || 0} answer(s) people keep changing, budget $${budget}${dry ? ' (dry: nothing is filed)' : ''}`);
+  const work = [...(questions.targets || []).map(target => ({target, kind: 'question'})), ...(buttons.targets || []).map(target => ({target, kind: 'button'})),
+    ...(fixes.targets || []).map(target => ({target: {...target, installs: 3}, kind: 'question', fix: true}))].slice(0, max);
+  for (const {target, kind, fix} of work) {
     if (summary.spent >= budget) { log(`budget reached at $${summary.spent.toFixed(4)}: stopping`); break; }
     summary.considered++;
     let decision, cost = 0;
@@ -67,6 +68,10 @@ export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3
       }
     } catch (error) { decision = {action: 'skip', why: `error: ${error.message}`}; }
     summary.spent += cost;
+    // A wording people keep correcting is only ever a candidate for the owner, never a canary; and the same meaning as today's is a value-format matter, not a mapping one.
+    if (fix && decision.alias) decision = decision.alias.key === target.current ? {action: 'skip', why: `same field as now (${target.current}): the value, not the mapping, is what people change`}
+      : {...decision, action: 'candidate', why: `${target.corrected} of ${target.n} fills were changed by hand (was: ${target.current || 'no alias'})`};
+    if (fix && !decision.alias) reviewed.push({label: target.label});
     if (decision.action === 'skip' && /^(model:|invalid alias|the phrase is not)/.test(decision.why || '')) reviewed.push({label: target.label});   // not looked at again for a month
     if (decision.alias && !dry) {
       const put = await fetcher(`${site}/api/aliases`, {method: 'PUT', headers: owner, body: JSON.stringify({items: [decision.alias], source: 'proposer',
