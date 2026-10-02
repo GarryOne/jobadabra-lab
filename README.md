@@ -8,6 +8,7 @@ itself. Not published (Notion 🧭 Strategy → 💰 IP & Monetization, 🪜 Sta
 | `prompts/*.md` | the product brain (brief, explore, Sunday review) and weekly self-review prompts. **Edit here, then run `tools/sync-prompts.sh`**: they become encrypted secrets of the public repo, where the workflows run |
 | `triage/` + `.github/workflows/triage.yml` | the **daily triage**: pulls recurring problems from the site's queue (several installs, or very often) and files them as issues here, one per problem. Needs `LAB_KEY` |
 | `lab/` + `.github/workflows/form-lab.yml` | the **form lab**: a daily headless browser runs the extension's operators on public application forms (never submits), aimed by the site's plan; reports to the site; gives a candidate recipe a canary. Needs the secret `LAB_KEY`; runs the operators from the public repo's `extension/` |
+| `proposer/` + `.github/workflows/proposer.yml` | the **recipe proposer**: daily, for failing controls without a recipe it asks a small model (Haiku, capped at 20 controls and $0.50 a run), validates the answer with the extension's own `recipe-schema.js` and files it as a **candidate**; the form lab tries it, the canary rolls it out. Needs `LAB_KEY` and `ANTHROPIC_API_KEY` |
 | `docs/specs/` | private specs (Brain API, license keys, Stage 2) |
 | `.claude/skills/notion-map` | map of the private Notion workspace, linked on the owner's Mac as `~/.claude/skills/notion-map` |
 
