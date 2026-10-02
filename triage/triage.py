@@ -78,7 +78,8 @@ def main():
     if not key:
         print('No LAB_KEY: nothing to do.')
         return
-    headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
+    # urllib's own User-Agent is blocked at Cloudflare's edge (403), so send ours
+    headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'User-Agent': 'job-pilotto-internal-triage'}
     with urllib.request.urlopen(urllib.request.Request(f'{options.site}/api/triage', headers=headers), timeout=30) as response:
         items = json.load(response).get('items', [])
     print(f'{len(items)} item(s) in the queue')
