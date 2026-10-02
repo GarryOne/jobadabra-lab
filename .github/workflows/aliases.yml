@@ -1,0 +1,45 @@
+name: Alias proposer
+# Daily, after the recipe proposer: question wordings that several installs report and no alias places get a meaning proposed by a small
+# model, checked by a second pass and the extension's own validator, and filed on the site. Confirmed non-sensitive meanings with enough
+# independent reports start a 5% canary (the site grows or halts it from real outcomes); the rest wait as candidates for the owner
+# (aliases/approve.mjs). Capped at --max questions and --budget dollars a run.
+# Secrets: LAB_KEY (the site's STATS_KEY), ANTHROPIC_API_KEY.
+on:
+  schedule:
+    - cron: '57 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry: {description: 'Dry run: ask the model, file nothing', required: false, default: 'false'}
+
+permissions:
+  contents: read
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LAB_KEY: ${{ secrets.LAB_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto
+          path: public
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - name: The alias proposer's own tests
+        run: node --test aliases/aliases.test.mjs
+      - name: Propose meanings
+        run: |
+          flags=""
+          if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi
+          node aliases/proposer.mjs --extension public/extension --max 25 --budget 0.3 --out aliases-result.json $flags | tee aliases.log
+      - name: Summary
+        if: always()
+        run: |
+          { echo '### Alias proposer'; echo; echo '```'; tail -n 40 aliases.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: aliases-result, path: aliases-result.json, retention-days: 14, if-no-files-found: ignore}
