@@ -4,9 +4,9 @@
 // request the page makes is blocked, and nothing but the operators' own clicks is done. It also tries the site's candidate recipes
 // and, when one works on enough different pages, gives it a small canary. Design: Notion "Self-improving form filling".
 //   node lab/form-lab.mjs --urls urls.txt [--max 25] [--site https://www.jobpilotto.workers.dev] [--key KEY | env LAB_KEY]
-//                           [--promote] [--extension ../extension] [--out result.json] [--dry]
+//                           [--promote] [--extension ../public/extension] [--out result.json] [--dry]
 // Needs playwright-core and a Chromium (the workflow installs them); CHROME_PATH points at a local one. The operators it runs are the
-// extension's own (page/skeleton.js, page/controls.js): --extension DIR is a checkout of the private extension repo.
+// extension's own (page/skeleton.js, page/controls.js): --extension DIR is the public repo's extension/ folder.
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {applicationUrl, decidePromotion, runsFrom, siteOf, testAnswer} from './form-lab-lib.mjs';
