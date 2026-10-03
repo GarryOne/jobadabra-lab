@@ -10,6 +10,7 @@ A crawl is read once (its id is remembered in scout_meta); a new crawl appears a
 the index's own paging. Nothing about any user is involved.
 """
 import argparse
+import http.client
 import json
 import re
 import sqlite3
@@ -48,7 +49,7 @@ def get(url, timeout=120, retries=RETRIES, backoff=BACKOFF_S):
             request = urllib.request.Request(url, headers={'User-Agent': ats.USER_AGENT})
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read().decode('utf-8', 'replace')
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as error:   # IncompleteRead: a cut-off answer
             status = getattr(error, 'code', None)
             if attempt == retries - 1 or (status and status not in (429, 500, 502, 503, 504)):
                 raise
@@ -98,7 +99,9 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
     known |= {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM feed_sources')}
     fresh = sorted(found - known)[:MAX_NEW]
-    candidates = [dict(name=slug, origin=f'Common Crawl {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
+    # The job system is part of the source's name ("Common Crawl workday"), so the learned priorities measure each system's yield
+    # separately and probe first the systems whose boards turn out to have roles in people's places.
+    candidates = [dict(name=slug, origin=f'Common Crawl {system} {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
     added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
     if not failed:   # a crawl counts as read only when every listing came through; else tomorrow's run tries again
         db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))

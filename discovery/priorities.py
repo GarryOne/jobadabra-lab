@@ -17,6 +17,7 @@ PRIOR_FOUND, PRIOR_PROBED = 1, 6     # smoothing: a new source starts at about o
 
 
 def kind(origin):
+    """Same grouping as the public engine's scout_ideas.origin_kind: 'Common Crawl workday CC-MAIN-2026-39' -> 'Common Crawl workday'."""
     return re.split(r'[:(]|\s\d{4}-|\sCC-MAIN', origin or '')[0].strip()
 
 

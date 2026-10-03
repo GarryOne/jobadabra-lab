@@ -69,7 +69,8 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual((first['crawl'], first['boards'], first['added']), ('CC-MAIN-2026-39', 3, 3))
         self.assertEqual(again['added'], 0, 'a crawl is read once')
         rows = {(r['ats'], r['slug'], r['origin'], r['priority']) for r in db.execute('SELECT ats, slug, origin, priority FROM scout_candidates')}
-        self.assertIn(('ashby', 'acme', 'Common Crawl CC-MAIN-2026-39', 70), rows)
+        self.assertIn(('ashby', 'acme', 'Common Crawl ashby CC-MAIN-2026-39', 70), rows)
+        self.assertEqual(self.prio.kind('Common Crawl ashby CC-MAIN-2026-39'), 'Common Crawl ashby')
         self.assertEqual({r[1] for r in rows}, {'acme', 'beta', 'gamma'})
 
     def test_a_failing_listing_does_not_stop_the_others_and_the_crawl_is_read_again_next_time(self):
@@ -96,6 +97,17 @@ class DiscoveryTests(unittest.TestCase):
         with mock.patch('urllib.request.urlopen', side_effect=lambda r, timeout: _Ctx(opener(r, timeout))):
             self.assertEqual(self.cc.get('https://index.commoncrawl.org/x', backoff=0), 'ok')
         self.assertEqual(len(calls), 3)
+
+    def test_a_cut_off_answer_is_retried_too(self):
+        import http.client
+        calls = []
+        def opener(request, timeout):
+            calls.append(1)
+            if len(calls) < 2:
+                raise http.client.IncompleteRead(b'x')
+            return _Ctx(io.BytesIO(b'ok'))
+        with mock.patch('urllib.request.urlopen', side_effect=opener):
+            self.assertEqual(self.cc.get('https://index.commoncrawl.org/x', backoff=0), 'ok')
 
     def test_priorities_follow_each_sources_measured_yield_and_tier1_keeps_its_own(self):
         db = self.database()
