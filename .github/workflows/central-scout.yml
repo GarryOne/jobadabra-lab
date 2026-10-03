@@ -1,7 +1,11 @@
 # Job Pilotto — the central scout. Runs the PUBLIC engine's source scout once a day with no user's data (no Notion,
-# no Telegram, no AI), verifies every known feed and uploads the employer index to the website worker
+# no Telegram), verifies every known feed and uploads the employer index to the website worker
 # (PUT https://www.jobpilotto.workers.dev/api/index). Apps and Always-on runs download it (GET /api/index).
 # Secret: INDEX_PUBLISH_KEY (= the website worker's secret of the same name; Keychain job-pilotto.site.index_publish_key).
+# The large-scale discovery is private and lives here (3 Oct 2026): every job board Common Crawl has seen (discovery/commoncrawl.py) and the
+# queue ranked by each source's measured yield (discovery/priorities.py). With ANTHROPIC_API_KEY, the public engine's AI steps also run here,
+# once for everyone: ideas for new employers (every third day) and reading careers pages the rules cannot (capped per run); the recipes they
+# learn travel to every install in the index. Without the key they are simply skipped.
 name: Central scout
 run-name: central scout${{ inputs.batch && format(' {0}', inputs.batch) || '' }}
 
@@ -10,7 +14,7 @@ on:
     - cron: '20 4 * * *'   # UTC, before the users' morning runs
   workflow_dispatch:
     inputs:
-      batch: {description: 'candidates to probe this run', required: false, default: '120'}
+      batch: {description: 'candidates to probe this run', required: false, default: '500'}
 
 permissions:
   contents: read
@@ -28,17 +32,16 @@ env:
 jobs:
   scout:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         with:
           repository: GarryOne/job-pilotto
           ref: main
-      - name: This private repo (the curated seed lists)
+      - name: This private repo (the curated seed lists and the discovery)
         uses: actions/checkout@v4
         with:
           path: ops
-          sparse-checkout: config
       - name: Load the private seed lists
         run: cp ops/config/scout_seeds.json config/scout_seeds.json
       - uses: actions/setup-python@v5
@@ -50,10 +53,19 @@ jobs:
           path: data/jobs.sqlite
           key: central-scout-db-${{ github.run_id }}
           restore-keys: central-scout-db-
+      - name: Install the AI library and the headless browser
+        continue-on-error: true
+        run: pip install --quiet -r requirements.txt -r requirements-render.txt && playwright install --with-deps chromium
+      - name: Every job board Common Crawl has seen (once per new crawl)
+        continue-on-error: true   # the archive being slow must never cost the day's index
+        run: python ops/discovery/commoncrawl.py --db data/jobs.sqlite
+      - name: Rank the queue by each source's measured yield
+        run: python ops/discovery/priorities.py --db data/jobs.sqlite
       - name: Scout and publish the index
         env:
           INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
-          BATCH: ${{ inputs.batch || '120' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BATCH: ${{ inputs.batch || '500' }}
         run: python -m src scout --batch "$BATCH" --publish-index
       - name: Tell the owner when it fails
         if: failure()

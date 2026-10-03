@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Every public job board Common Crawl has seen, as candidates for the central scout.
+
+Guessing feed addresses from company names finds a few a day. Common Crawl (a free, public web archive) keeps an index of every address it
+crawled: asking it for `jobs.ashbyhq.com/*`, `*.teamtailor.com` and the like lists the boards that exist (one crawl held 1,924 Ashby boards
+when the index had 121). Each board's address names the job system and its slug, so the scout probes it with one request.
+
+Runs inside the central scout (central-scout.yml), from a checkout of the public engine: `python ops/discovery/commoncrawl.py --db data/jobs.sqlite`.
+A crawl is read once (its id is remembered in scout_meta); a new crawl appears about monthly. Polite: one request at a time, a pause between them,
+the index's own paging. Nothing about any user is involved.
+"""
+import argparse
+import json
+import re
+import sqlite3
+import sys
+import time
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path.cwd()))   # the public engine's checkout
+from src import scout  # noqa: E402
+from src.sources import ats  # noqa: E402
+
+INDEX = 'https://index.commoncrawl.org'
+# What to ask the index for, per job system (the address patterns ats.detect understands).
+QUERIES = (
+    ('greenhouse', 'url=boards.greenhouse.io/*'), ('greenhouse', 'url=job-boards.greenhouse.io/*'), ('lever', 'url=jobs.lever.co/*'),
+    ('ashby', 'url=jobs.ashbyhq.com/*'), ('workable', 'url=apply.workable.com/*'), ('recruitee', 'url=recruitee.com&matchType=domain'),
+    ('personio', 'url=jobs.personio.de&matchType=domain'), ('teamtailor', 'url=teamtailor.com&matchType=domain'),
+    ('smartrecruiters', 'url=jobs.smartrecruiters.com/*'), ('join', 'url=join.com/companies/*'), ('workday', 'url=myworkdayjobs.com&matchType=domain'),
+)
+PAUSE_S = 1.5
+PRIORITY = 70          # a board known to exist: above guessed names, below Tier 1 and Swiss catalogs (the learned priorities adjust it)
+MAX_NEW = 3000         # candidates added per run, so one run never floods the queue
+
+
+def get(url, timeout=120):
+    request = urllib.request.Request(url, headers={'User-Agent': ats.USER_AGENT})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read().decode('utf-8', 'replace')
+
+
+def latest_crawl(fetch=get):
+    return json.loads(fetch(f'{INDEX}/collinfo.json'))[0]['id']
+
+
+def boards(crawl, query, fetch=get, pause=PAUSE_S):
+    """{(ats, slug)} for one query over one crawl, all pages."""
+    base = f'{INDEX}/{crawl}-index?{query}&output=json&fl=url'
+    pages = json.loads(fetch(base + '&showNumPages=true')).get('pages', 1)
+    found = set()
+    for page in range(pages):
+        time.sleep(pause)
+        try:
+            text = fetch(f'{base}&page={page}')
+        except Exception as error:  # noqa: BLE001 — one page failing must not lose the others
+            print(f'Warning: {query} page {page}: {type(error).__name__}')
+            continue
+        for line in text.splitlines():
+            try:
+                url = json.loads(line)['url']
+            except (ValueError, KeyError):
+                continue
+            hit = ats.detect(url)
+            if hit and hit[0] in ats.FETCHERS and re.fullmatch(r'[\w.-]{2,120}', hit[1]):
+                found.add(hit)
+    return found
+
+
+def run(db, fetch=get, pause=PAUSE_S, crawl=None):
+    """Add the boards of the newest crawl not read yet. Returns {'crawl', 'boards', 'added'} (added 0 when this crawl was read before)."""
+    db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    crawl = crawl or latest_crawl(fetch)
+    done = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl'").fetchone()
+    if done and done[0] == crawl:
+        return {'crawl': crawl, 'boards': 0, 'added': 0}
+    found = set()
+    for system, query in QUERIES:
+        got = boards(crawl, query, fetch, pause)
+        print(f'{system}: {len(got)} boards')
+        found |= got
+    known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
+    known |= {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM feed_sources')}
+    fresh = sorted(found - known)[:MAX_NEW]
+    candidates = [dict(name=slug, origin=f'Common Crawl {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
+    added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
+    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
+    db.commit()
+    return {'crawl': crawl, 'boards': len(found), 'added': added}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--db', type=Path, default=Path('data/jobs.sqlite'))
+    args = parser.parse_args()
+    args.db.parent.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(args.db)
+    db.row_factory = sqlite3.Row
+    db.executescript(scout.TABLES)
+    print(json.dumps(run(db)))
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,32 @@
+# Job Pilotto — weekly check that the scout still reads real Swiss career sites (moved here from the public repo on 3 Oct 2026: the list of
+# sites is a curated set of good sources). Reads config/scout_canary.json with the PUBLIC engine's rules (no AI, no browser) and fails when
+# fewer than min_found still give a job feed. A red run: open the lost sites by hand, then fix the public src/sources/careers.py or the list.
+name: Scout canary
+run-name: scout canary
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto
+          ref: main
+      - name: This private repo (the site list and the tool)
+        uses: actions/checkout@v4
+        with:
+          path: ops
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read the sites
+        run: python ops/canary/scout_canary.py | tee "$GITHUB_STEP_SUMMARY"
