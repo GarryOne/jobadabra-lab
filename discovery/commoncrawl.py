@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -36,10 +37,22 @@ PRIORITY = 70          # a board known to exist: above guessed names, below Tier
 MAX_NEW = 3000         # candidates added per run, so one run never floods the queue
 
 
-def get(url, timeout=120):
-    request = urllib.request.Request(url, headers={'User-Agent': ats.USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.read().decode('utf-8', 'replace')
+RETRIES = 4
+BACKOFF_S = 15
+
+
+def get(url, timeout=120, retries=RETRIES, backoff=BACKOFF_S):
+    """The archive's answer; its index is often slow (502/503/504, timeouts), so each request is tried a few times with a growing pause."""
+    for attempt in range(retries):
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': ats.USER_AGENT})
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.read().decode('utf-8', 'replace')
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            status = getattr(error, 'code', None)
+            if attempt == retries - 1 or (status and status not in (429, 500, 502, 503, 504)):
+                raise
+            time.sleep(backoff * (attempt + 1))
 
 
 def latest_crawl(fetch=get):
@@ -53,11 +66,7 @@ def boards(crawl, query, fetch=get, pause=PAUSE_S):
     found = set()
     for page in range(pages):
         time.sleep(pause)
-        try:
-            text = fetch(f'{base}&page={page}')
-        except Exception as error:  # noqa: BLE001 — one page failing must not lose the others
-            print(f'Warning: {query} page {page}: {type(error).__name__}')
-            continue
+        text = fetch(f'{base}&page={page}')   # a page that still fails after the retries fails this listing (tried again next run)
         for line in text.splitlines():
             try:
                 url = json.loads(line)['url']
@@ -76,9 +85,14 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     done = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl'").fetchone()
     if done and done[0] == crawl:
         return {'crawl': crawl, 'boards': 0, 'added': 0}
-    found = set()
+    found, failed = set(), []
     for system, query in QUERIES:
-        got = boards(crawl, query, fetch, pause)
+        try:
+            got = boards(crawl, query, fetch, pause)
+        except Exception as error:  # noqa: BLE001 — one job system's listing failing must not lose the others
+            print(f'Warning: {system}: {type(error).__name__}: {error}')
+            failed.append(system)
+            continue
         print(f'{system}: {len(got)} boards')
         found |= got
     known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
@@ -86,9 +100,10 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     fresh = sorted(found - known)[:MAX_NEW]
     candidates = [dict(name=slug, origin=f'Common Crawl {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
     added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
-    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
+    if not failed:   # a crawl counts as read only when every listing came through; else tomorrow's run tries again
+        db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
     db.commit()
-    return {'crawl': crawl, 'boards': len(found), 'added': added}
+    return {'crawl': crawl, 'boards': len(found), 'added': added, 'failed': failed}
 
 
 def main():

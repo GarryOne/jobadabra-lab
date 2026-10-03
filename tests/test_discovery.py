@@ -22,6 +22,17 @@ def module(path, name):
     return loaded
 
 
+class _Ctx:
+    def __init__(self, body):
+        self.body = body
+
+    def __enter__(self):
+        return self.body
+
+    def __exit__(self, *exc):
+        return False
+
+
 @unittest.skipUnless((ENGINE / 'src' / 'scout.py').exists(), 'the public engine is not checked out next to this repo')
 class DiscoveryTests(unittest.TestCase):
     @classmethod
@@ -60,6 +71,31 @@ class DiscoveryTests(unittest.TestCase):
         rows = {(r['ats'], r['slug'], r['origin'], r['priority']) for r in db.execute('SELECT ats, slug, origin, priority FROM scout_candidates')}
         self.assertIn(('ashby', 'acme', 'Common Crawl CC-MAIN-2026-39', 70), rows)
         self.assertEqual({r[1] for r in rows}, {'acme', 'beta', 'gamma'})
+
+    def test_a_failing_listing_does_not_stop_the_others_and_the_crawl_is_read_again_next_time(self):
+        db = self.database()
+        good = self.archive(['https://jobs.lever.co/gamma/abc'])
+        def fetch(url):
+            if 'ashbyhq' in url and 'collinfo' not in url:
+                raise OSError('504')
+            return good(url)
+        with mock.patch.object(self.cc, 'QUERIES', (('ashby', 'url=jobs.ashbyhq.com/*'), ('lever', 'url=jobs.lever.co/*'))), redirect_stdout(io.StringIO()):
+            first = self.cc.run(db, fetch, pause=0)
+            second = self.cc.run(db, good, pause=0)
+        self.assertEqual((first['added'], first['failed']), (1, ['ashby']))
+        self.assertEqual(second['failed'], [], 'the crawl was not marked as read, so the next run tries again')
+
+    def test_the_archive_is_asked_again_after_a_gateway_error(self):
+        import urllib.error
+        calls = []
+        def opener(request, timeout):
+            calls.append(1)
+            if len(calls) < 3:
+                raise urllib.error.HTTPError(request.full_url, 504, 'Gateway Time-out', {}, None)
+            return io.BytesIO(b'ok')
+        with mock.patch('urllib.request.urlopen', side_effect=lambda r, timeout: _Ctx(opener(r, timeout))):
+            self.assertEqual(self.cc.get('https://index.commoncrawl.org/x', backoff=0), 'ok')
+        self.assertEqual(len(calls), 3)
 
     def test_priorities_follow_each_sources_measured_yield_and_tier1_keeps_its_own(self):
         db = self.database()
