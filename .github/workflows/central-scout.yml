@@ -66,7 +66,13 @@ jobs:
           INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BATCH: ${{ inputs.batch || '500' }}
+          JOB_PILOTTO_AI_COST_FILE: ${{ runner.temp }}/ai-cost.json
         run: python -m src scout --batch "$BATCH" --publish-index
+      - name: Report the AI cost to /ai-cost
+        if: always()
+        env:
+          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
+        run: node desktop/e2e/ai-cost-report.mjs --job central-scout --file "$RUNNER_TEMP/ai-cost.json"
       - name: Tell the owner when it fails
         if: failure()
         env:

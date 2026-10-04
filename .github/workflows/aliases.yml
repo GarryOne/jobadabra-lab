@@ -40,6 +40,11 @@ jobs:
         if: always()
         run: |
           { echo '### Alias proposer'; echo; echo '```'; tail -n 40 aliases.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report the AI cost to /ai-cost
+        if: always()
+        env:
+          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
+        run: node public/desktop/e2e/ai-cost-report.mjs --job alias-proposer --file aliases-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: aliases-result, path: aliases-result.json, retention-days: 14, if-no-files-found: ignore}

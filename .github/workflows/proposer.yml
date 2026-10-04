@@ -41,6 +41,11 @@ jobs:
         if: always()
         run: |
           { echo '### Recipe proposer'; echo; echo '```'; tail -n 40 proposer.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report the AI cost to /ai-cost
+        if: always()
+        env:
+          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
+        run: node public/desktop/e2e/ai-cost-report.mjs --job recipe-proposer --file proposer-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: proposer-result, path: proposer-result.json, retention-days: 14, if-no-files-found: ignore}
