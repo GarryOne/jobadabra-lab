@@ -29,3 +29,10 @@ test('the model sees the top weaknesses and the week, nothing else', () => {
   const seen = JSON.parse(brief({...digest, daily: [{day: 'x'}], notes: ['n']}));
   assert.deepEqual(Object.keys(seen), ['period', 'thisWeek', 'lastWeek', 'versions', 'boards', 'weaknesses']);
 });
+
+test('a proposal that breaks a hard rule (submitting, ticking consents) is dropped', () => {
+  const answer = JSON.stringify({proposals: [
+    {weaknesses: ['cause:no_data:ashby'], title: 'Auto-check confirmation checkboxes with smart matching', area: 'operator', change: 'Tick them.'},
+    {weaknesses: ['cause:no_data:ashby'], title: 'Ask for notice period', area: 'data', change: 'Add a profile field.'}]});
+  assert.deepEqual(proposals(answer, digest).map(p => p.title), ['Ask for notice period']);
+});

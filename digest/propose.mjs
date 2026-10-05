@@ -15,11 +15,16 @@ how well it filled forms (per day, per release, per job board) and its weaknesse
 to, counts this week and last, the rate per release, and evidence (a question's public wording, a public form page, a widget's kind).
 Propose the 3 changes that would remove the most lost questions next week. Prefer the highest impact; prefer a fix that helps many boards;
 say when a weakness is already improving in the latest release (then propose something else). Never invent numbers or ids.
+The product's hard rules (never propose breaking them): it never submits a form, never ticks a consent, terms, privacy or legal
+checkbox (those stay the person's choice), never answers for the person what it does not know (no guessing personal facts), and
+never sends the person's answers or data anywhere new.
 Answer with JSON only: {"proposals": [{"weaknesses": ["<id>", ...], "title": "<imperative, under 70 chars>", "area": "reader|data|AI|AI availability|operator|validation",
 "change": "<what to change, concretely, 2-4 sentences>", "evidence": "<the numbers from the digest that justify it>",
 "verify": "<how to prove it: a replay fixture, a lab page, the digest number that must move>", "confidence": "high|medium|low"}]}`;
 
 export const AREAS = ['reader', 'data', 'AI', 'AI availability', 'operator', 'validation'];
+// A proposal that would break a hard rule is dropped even if the model offers it.
+export const FORBIDDEN = /\b(auto-?(submit|check|tick)|submit the form|tick (the )?(consent|terms|privacy|legal)|check (the )?(consent|terms|privacy|legal|confirmation)|(consent|terms|privacy|legal|confirmation) check-?boxes?)\b/i;
 export const MARK = id => `<!-- form-learning:${id} -->`;
 
 // The part of the digest the model sees: the week's numbers, releases, and the top weaknesses with their evidence.
@@ -35,6 +40,7 @@ export function proposals(text, digest) {
   const known = new Set((digest.weaknesses || []).map(w => w.id));
   return (Array.isArray(parsed?.proposals) ? parsed.proposals : []).map(p => ({...p, weaknesses: (Array.isArray(p?.weaknesses) ? p.weaknesses : []).filter(id => known.has(id))}))
     .filter(p => p.weaknesses.length && AREAS.includes(p.area) && typeof p.title === 'string' && p.title.trim() && typeof p.change === 'string')
+    .filter(p => !FORBIDDEN.test(`${p.title} ${p.change}`))
     .slice(0, 3).map(p => ({weaknesses: p.weaknesses, title: p.title.trim().slice(0, 90), area: p.area, change: String(p.change).slice(0, 1200),
       evidence: String(p.evidence || '').slice(0, 800), verify: String(p.verify || '').slice(0, 600), confidence: ['high', 'medium', 'low'].includes(p.confidence) ? p.confidence : 'low'}));
 }
