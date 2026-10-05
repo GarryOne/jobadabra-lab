@@ -1,0 +1,52 @@
+name: Form learning
+# Weekly: read the form-filling learning digest (the site's /admin/form-filling/digest.json: efficiency per day and release, weaknesses
+# ranked by impact with evidence) and ask a small model for the 3 improvements that would remove the most lost questions. Each is filed
+# here as an issue (label form-learning) citing the digest's own weakness ids; one still open for the same weaknesses is updated instead.
+# One model call, Haiku, capped by --budget; its cost goes to /admin/ai-cost. A person decides; nothing is changed automatically.
+# Secrets: LAB_KEY (the site's scripts' key), ANTHROPIC_API_KEY, AI_COST_PUBLISH_KEY.
+on:
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry: {description: 'Dry run: ask the model, file nothing', required: false, default: 'false'}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LAB_KEY: ${{ secrets.LAB_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GarryOne/job-pilotto
+          path: public
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - name: Its own tests
+        run: node --test digest/propose.test.mjs
+      - name: Propose improvements
+        run: |
+          flags=""
+          if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi
+          node digest/propose.mjs --budget 0.05 --out form-learning.json $flags | tee form-learning.log
+      - name: Summary
+        if: always()
+        run: |
+          { echo '### Form learning'; echo; echo '```'; tail -n 30 form-learning.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report the AI cost to /ai-cost
+        if: always()
+        env:
+          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
+        run: node public/desktop/e2e/ai-cost-report.mjs --job form-learning --file form-learning.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: form-learning, path: form-learning.json, retention-days: 30, if-no-files-found: ignore}
