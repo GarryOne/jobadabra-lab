@@ -2,7 +2,7 @@
 // recipe has earned a canary.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {applicationUrl, decidePromotion, runsFrom, siteOf, testAnswer} from './form-lab-lib.mjs';
+import {QUESTION_KIND, applicationUrl, decidePromotion, questionRuns, readingCoverage, runsFrom, siteOf, testAnswer} from './form-lab-lib.mjs';
 
 test('the form is one level below the posting on Ashby and Lever, and the page is kept clean', () => {
   assert.equal(applicationUrl('https://jobs.ashbyhq.com/openai/621bb104-9daa-4c9e-949a-03d5730334e8'), 'https://jobs.ashbyhq.com/openai/621bb104-9daa-4c9e-949a-03d5730334e8/application');
@@ -34,4 +34,11 @@ test('a candidate recipe earns a canary only with enough tries, on enough differ
   assert.equal(decidePromotion(tries(10, 10, 1)).promote, false);  // one page only
   assert.equal(decidePromotion(tries(10, 8, 5)).promote, false);   // 80% is not enough
   assert.equal(decidePromotion([]).promote, false);
+});
+
+test('each required question is a run (ok when read), and coverage per board is read / required', () => {
+  const runs = questionRuns('ashby', [{question: 'How much has AI increased your speed?', fp: 'abc123xyz', read: false},
+    {question: 'Email', fp: 'def456uvw', read: true}, {question: 'no print', fp: '', read: true}], 'https://jobs.ashbyhq.com/x/application');
+  assert.deepEqual(runs.map(run => [run.kind, run.ok, run.why]), [[QUESTION_KIND, false, 'question on the page not read'], [QUESTION_KIND, true, '']]);
+  assert.deepEqual(readingCoverage(runs), [{site: 'ashby', required: 2, read: 1, rate: 0.5}]);
 });

@@ -44,3 +44,23 @@ export function decidePromotion(tries) {
   const rate = list.length ? ok / list.length : 0;
   return {promote: list.length >= PROMOTE_MIN_TRIES && pages.size >= PROMOTE_MIN_PAGES && rate >= PROMOTE_MIN_RATE, tries: list.length, ok, pages: pages.size, rate};
 }
+
+// Reading check (the extension's page/coverage.js audit): one run per question the page marks required, keyed by its area's
+// fingerprint: ok when the form reader read it, failed when not. The share ok per board, day by day, is the reader's coverage:
+// the number that shows whether reading gets better. `questions`: [{question, fp, read}] from the page.
+export const QUESTION_KIND = 'question', UNREAD_WHY = 'question on the page not read';
+export function questionRuns(site, questions, url = '') {
+  return (questions || []).filter(item => /^[a-z0-9]{6,16}$/.test(String(item?.fp || '')))
+    .map(item => ({site, fingerprint: item.fp, kind: QUESTION_KIND, recipe: 0, ok: !!item.read, why: item.read ? '' : UNREAD_WHY, url}));
+}
+// Coverage of one set of runs: read / required, per board.
+export function readingCoverage(runs) {
+  const by = new Map();
+  for (const run of (runs || []).filter(item => item?.kind === QUESTION_KIND)) {
+    const entry = by.get(run.site) || {site: run.site, required: 0, read: 0};
+    entry.required++;
+    if (run.ok) entry.read++;
+    by.set(run.site, entry);
+  }
+  return [...by.values()].map(entry => ({...entry, rate: entry.required ? entry.read / entry.required : 1}));
+}

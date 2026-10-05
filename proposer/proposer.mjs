@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {MODEL, SYSTEM, buildMessage, costUsd, decide, parseAnswer} from './proposer-lib.mjs';
+import {MODEL, OPERATOR_OF, SYSTEM, buildMessage, costUsd, decide, parseAnswer} from './proposer-lib.mjs';
 
 const SITE = 'https://www.jobpilotto.workers.dev';
 const log = (...parts) => console.log(`[proposer] ${parts.join(' ')}`);
@@ -37,6 +37,13 @@ export async function run({site = SITE, ownerKey, apiKey, max = 20, budget = 0.5
     if (summary.spent >= budget) { log(`budget reached at $${summary.spent.toFixed(4)}: stopping`); break; }
     summary.considered++;
     let decision, cost = 0;
+    // A kind no operator handles (an unread question from the reading check, a switch) cannot get a recipe: no model call.
+    if (!OPERATOR_OF[target.kind]) {
+      summary.skipped++;
+      summary.results.push({fingerprint: target.fingerprint, kind: target.kind, action: 'skip', why: `no operator for kind ${target.kind}`, cost: 0});
+      log(target.fingerprint, target.kind, `skipped (no operator for this kind, no model call)`);
+      continue;
+    }
     try {
       const {text, usage} = await ask(fetcher, apiKey, target);
       cost = costUsd(usage);

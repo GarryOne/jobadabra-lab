@@ -93,3 +93,9 @@ test('a dry run files nothing; the budget stops a run; a model or network error 
   const failed = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: broken});
   assert.match(failed.results[0].why, /error: Anthropic 400/);
 });
+
+test('a kind no operator handles (an unread question, a switch) is skipped without a model call', async () => {
+  const {fetcher, calls} = network([JSON.stringify(good)], [target({kind: 'question', fingerprint: 'unread01'}), target({kind: 'switch', fingerprint: 'switch01'})]);
+  const summary = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher});
+  assert.deepEqual([summary.considered, summary.skipped, summary.spent, calls.model], [2, 2, 0, 0]);
+});

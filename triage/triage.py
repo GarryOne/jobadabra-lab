@@ -35,7 +35,9 @@ def issue_for(item):
         key = f"report:{report['site']}:{'|'.join(sorted(f.get('label', '') + f.get('reason', '') for f in fields))}"[:200]
         lines = [f"- **{f.get('label', '?')}** ({f.get('type', '?')}{', required' if f.get('required') else ''}): {f.get('reason', '')}" for f in fields]
         return {'key': key, 'title': f"Fill failure: {report['site']} · {', '.join(labels)}"[:120], 'labels': ['fill-failure'],
-                'body': f"Reported by several installs (extension {report.get('version', '?')}).\n\n" + '\n'.join(lines)
+                'body': f"Reported from the app (extension {report.get('version', '?')}): the owner's app and questions the reader did not read come at once, others once several installs report them.\n\n"
+                        + '\n'.join(lines)
+                        + "\n\nReplay fixtures (one per field with a snapshot, red until fixed): `node tools/fill-fixture.mjs <this issue> --repo GarryOne/job-pilotto-internal` in the public repo."
                         + f"\n\n<details><summary>Snapshots</summary>\n\n```json\n{json.dumps(fields, indent=1)[:20000]}\n```\n</details>\n\n{marker(key)}"}
     if kind == 'problems':
         try:

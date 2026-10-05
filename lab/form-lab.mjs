@@ -9,7 +9,7 @@
 // extension's own (page/skeleton.js, page/controls.js): --extension DIR is the public repo's extension/ folder.
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {applicationUrl, decidePromotion, runsFrom, siteOf, testAnswer} from './form-lab-lib.mjs';
+import {QUESTION_KIND, applicationUrl, decidePromotion, questionRuns, readingCoverage, runsFrom, siteOf, testAnswer} from './form-lab-lib.mjs';
 
 const args = process.argv.slice(2);
 const flag = name => args.includes(`--${name}`);
@@ -22,6 +22,9 @@ const max = Number(option('max', '25')) || 25;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const skeleton = fs.readFileSync(`${root}skeleton.js`, 'utf8');
 const controls = fs.readFileSync(`${root}controls.js`, 'utf8');
+// The reading check runs the extension's own reader (page/fill.js describes the form) and coverage (page/coverage.js); an older
+// checkout without coverage.js skips it.
+const reader = fs.existsSync(`${root}coverage.js`) ? [fs.readFileSync(`${root}coverage.js`, 'utf8'), fs.readFileSync(`${root}fill.js`, 'utf8')] : null;
 const owner = () => ({Authorization: `Bearer ${key}`, 'Content-Type': 'application/json'});
 
 const urls = fs.readFileSync(option('urls'), 'utf8').split('\n').map(line => applicationUrl(line.trim())).filter(Boolean).slice(0, max);
@@ -73,7 +76,23 @@ for (const url of urls) {
       if (!operated.has(item.fp) && item.kind !== 'toggle-group') runs.push({site: name, fingerprint: item.fp, kind: item.kind, recipe: 0, ok: false, why: 'no operator for this kind', url});
       if (!operated.has(item.fp) || !item.options.length) samples.push({fingerprint: item.fp, kind: item.kind, skeleton: item.skeleton, question: item.question});
     }
-    console.log(`${name}: ${found.length} controls, ${results.filter(r => r.ok).length}/${results.length} operated  ${url}`);
+    // Reading: the required questions the page shows that the extension's reader did not read (what it would never ask Claude).
+    let unread = [];
+    if (reader) {
+      for (const source of reader) await page.evaluate(source);
+      const questions = await page.evaluate(async operatedQuestions => {
+        const shown = el => !!el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+        const kit = window.__jobPilottoSkeleton;
+        const read = [...(await window.__jobPilottoDescribeForm()).map(row => row.label),
+          ...window.__jobPilottoCheckboxQuestions().map(group => group.question), ...operatedQuestions];
+        return window.__jobPilottoCoverage.audit(document, read, shown).map(item => ({question: item.question, read: item.read,
+          fp: kit.fingerprint(kit.skeleton(item.area)), skeleton: item.read ? null : kit.skeleton(item.area)}));
+      }, results.filter(result => result.ok).map(result => result.question));
+      runs.push(...questionRuns(name, questions, url));
+      unread = questions.filter(item => !item.read);
+      for (const item of unread) samples.push({fingerprint: item.fp, kind: QUESTION_KIND, skeleton: item.skeleton, question: item.question});
+    }
+    console.log(`${name}: ${found.length} controls, ${results.filter(r => r.ok).length}/${results.length} operated; ${unread.length} required question(s) not read${unread.length ? `: ${unread.map(item => item.question).join(' | ')}` : ''}  ${url}`);
   } catch (error) {
     console.log(`${name}: skipped (${error.message.split('\n')[0]})  ${url}`);
   } finally { await page.close(); }
@@ -81,6 +100,7 @@ for (const url of urls) {
 }
 await browser.close();
 
+for (const row of readingCoverage(runs)) console.log(`reading ${row.site}: ${row.read}/${row.required} required questions read (${Math.round(row.rate * 100)}%)`);
 const decisions = [...tries].map(([fingerprint, list]) => ({fingerprint, ...decidePromotion(list)}));
 const out = {runs, samples: samples.slice(0, 50), decisions};
 if (option('out')) fs.writeFileSync(option('out'), JSON.stringify(out, null, 1));
