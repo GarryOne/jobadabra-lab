@@ -11,7 +11,7 @@ run-name: central scout${{ inputs.batch && format(' {0}', inputs.batch) || '' }}
 
 on:
   schedule:
-    - cron: '20 4 * * *'   # UTC, before the users' morning runs
+    - cron: '20 4,10,16,22 * * *'   # UTC, every 6 h (7 Oct 2026: installs check hourly and share as they find); 04:20 before the users' mornings
   workflow_dispatch:
     inputs:
       batch: {description: 'candidates to probe this run', required: false, default: '500'}
