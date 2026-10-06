@@ -42,8 +42,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: ops
-      - name: Load the private seed lists
-        run: cp ops/config/scout_seeds.json config/scout_seeds.json
+      - name: Load the private seed lists and starter feeds
+        # The starter feeds live here since 6 Oct 2026 (the public config/sources.json is empty): the central index carries them to every
+        # install with their places and role mix, so an install never crawls a list baked into it.
+        run: |
+          cp ops/config/scout_seeds.json config/scout_seeds.json
+          cp ops/config/starter_sources.json config/sources.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
