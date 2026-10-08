@@ -54,8 +54,9 @@ test('the message holds structure and the form\'s question only, and the prompt 
 });
 
 test('cost follows Haiku\'s list prices', () => {
-  assert.equal(MODEL.startsWith('claude-haiku-4-5'), true);
-  assert.ok(Math.abs(costUsd({input_tokens: 1000000, output_tokens: 1000000}) - 6) < 1e-9);
+  assert.equal(MODEL, 'claude-haiku-5-5');
+  assert.ok(Math.abs(costUsd({input_tokens: 1000000, output_tokens: 1000000}) - 0.6) < 1e-9);
+  assert.ok(Math.abs(costUsd({input_tokens: 1000000, output_tokens: 1000000}, 'claude-haiku-4-5') - 6) < 1e-9);
   assert.equal(costUsd({}), 0);
 });
 
@@ -67,7 +68,7 @@ function network(replies, targets) {
     if (url.includes('/api/recipes/targets')) return json({targets});
     if (url.includes('/api/recipes')) { calls.put.push(JSON.parse(init.body)); return json({ok: true}); }
     const text = replies[Math.min(calls.model++, replies.length - 1)];
-    return json({content: [{text}], usage: {input_tokens: 1500, output_tokens: 80}});
+    return json({content: [{type: 'thinking', thinking: '', signature: 's'}, {type: 'text', text}], usage: {input_tokens: 1500, output_tokens: 80}});
   };
   return {fetcher, calls};
 }
@@ -87,7 +88,7 @@ test('a dry run files nothing; the budget stops a run; a model or network error 
   assert.equal((await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: dry.fetcher, dry: true})).submitted, 5);
   assert.equal(dry.calls.put.length, 0);
   const capped = network([JSON.stringify(good)], many);
-  const stopped = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: capped.fetcher, budget: 0.003});
+  const stopped = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: capped.fetcher, budget: 0.0003});
   assert.ok(stopped.considered < 5, 'stopped early');
   const broken = async url => (url.includes('/targets') ? {ok: true, json: async () => ({targets: [target()]})} : {ok: false, status: 400});
   const failed = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: broken});

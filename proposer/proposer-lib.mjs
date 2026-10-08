@@ -3,8 +3,8 @@
 // scrubbed skeleton, its question and why it failed, and answers with the few options a recipe may set. Whatever it answers is
 // checked by the SAME validator the site and the extension use, and is only ever filed as a CANDIDATE: the form lab tries it on real
 // pages and the canary decides, so a wrong guess costs a lab visit, never a user's form.
-export const MODEL = 'claude-haiku-4-5-20251001';
-const PRICES = {'claude-haiku-4-5': [1, 5]};   // USD per million tokens (input, output), Anthropic list prices
+export const MODEL = 'claude-haiku-5-5';   // 8 Oct 2026; it thinks first at low effort, and rejects temperature (400)
+const PRICES = {'claude-haiku-5-5': [0.1, 0.5], 'claude-haiku-4-5': [1, 5]};   // USD per million tokens (input, output), Anthropic list prices
 export const OPERATOR_OF = {'toggle-group': 'toggle', 'custom-select': 'select', date: 'date'};
 
 export function costUsd(usage = {}, model = MODEL) {

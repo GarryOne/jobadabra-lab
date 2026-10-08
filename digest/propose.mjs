@@ -56,11 +56,11 @@ export function issueBody(p, digest) {
 }
 
 async function ask(apiKey, digest, fetcher = fetch) {
-  const body = JSON.stringify({model: MODEL, max_tokens: 1500, temperature: 0, system: SYSTEM, messages: [{role: 'user', content: brief(digest)}]});
+  const body = JSON.stringify({model: MODEL, max_tokens: 2000, output_config: {effort: 'low'}, system: SYSTEM, messages: [{role: 'user', content: brief(digest)}]});
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await fetcher('https://api.anthropic.com/v1/messages', {method: 'POST', body,
       headers: {'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}});
-    if (response.ok) { const data = await response.json(); return {text: data.content?.[0]?.text || '', usage: data.usage || {}}; }
+    if (response.ok) { const data = await response.json(); return {text: data.content?.find(block => block.type === 'text')?.text || '', usage: data.usage || {}}; }
     if (![429, 500, 502, 503, 529].includes(response.status)) throw new Error(`Anthropic ${response.status}`);
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
