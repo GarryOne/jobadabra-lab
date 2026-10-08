@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, parseJson, verifyMessage} from './aliases-lib.mjs';
+import {BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 
 const SITE = 'https://www.jobpilotto.workers.dev';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
@@ -32,18 +32,29 @@ export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3
     if (!listed.ok) throw new Error(`targets: HTTP ${listed.status}`);
     return listed.json();
   };
-  const questions = await list('1'), buttons = await list('buttons'), fixes = await list('fixes').catch(() => ({targets: []}));
+  const questions = await list('1'), buttons = await list('buttons'), uploads = await list('uploads').catch(() => ({targets: []})), fixes = await list('fixes').catch(() => ({targets: []}));
   const summary = {considered: 0, canary: 0, candidate: 0, skipped: 0, spent: 0, results: []};
   const reviewed = [];
   log(`${questions.targets?.length || 0} question(s) and ${buttons.targets?.length || 0} button text(s) without a meaning, ${fixes.targets?.length || 0} answer(s) people keep changing, budget $${budget}${dry ? ' (dry: nothing is filed)' : ''}`);
-  const work = [...(questions.targets || []).map(target => ({target, kind: 'question'})), ...(buttons.targets || []).map(target => ({target, kind: 'button'})),
+  const work = [...(questions.targets || []).map(target => ({target, kind: 'question'})), ...(buttons.targets || []).map(target => ({target, kind: 'button'})), ...(uploads.targets || []).map(target => ({target, kind: 'upload'})),
     ...(fixes.targets || []).map(target => ({target: {...target, installs: 3}, kind: 'question', fix: true}))].slice(0, max);
   for (const {target, kind, fix} of work) {
     if (summary.spent >= budget) { log(`budget reached at $${summary.spent.toFixed(4)}: stopping`); break; }
     summary.considered++;
     let decision, cost = 0;
     try {
-      if (kind === 'button') {
+      if (kind === 'upload') {
+        const first = await ask(fetcher, apiKey, UPLOAD_SYSTEM, uploadMessage(target));
+        cost += costUsd(first.usage);
+        const proposal = parseJson(first.text);
+        let verdict = null;
+        if (['resume', 'cover_letter'].includes(proposal?.file)) {
+          const second = await ask(fetcher, apiKey, UPLOAD_VERIFY, uploadMessage(target, proposal.file));
+          cost += costUsd(second.usage);
+          verdict = parseJson(second.text);
+        }
+        decision = decideUpload({target, proposal, verdict, validateAlias: schema.validateAlias});
+      } else if (kind === 'button') {
         const first = await ask(fetcher, apiKey, BUTTON_SYSTEM, buttonMessage(target));
         cost += costUsd(first.usage);
         const proposal = parseJson(first.text);
