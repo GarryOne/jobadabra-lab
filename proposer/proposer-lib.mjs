@@ -5,7 +5,7 @@
 // pages and the canary decides, so a wrong guess costs a lab visit, never a user's form.
 export const MODEL = 'claude-haiku-5-5';   // 8 Oct 2026; it thinks first at low effort, and rejects temperature (400)
 const PRICES = {'claude-haiku-5-5': [0.1, 0.5], 'claude-haiku-4-5': [1, 5]};   // USD per million tokens (input, output), Anthropic list prices
-export const OPERATOR_OF = {'toggle-group': 'toggle', 'custom-select': 'select', date: 'date'};
+export const OPERATOR_OF = {'toggle-group': 'toggle', 'custom-select': 'select', date: 'date', upload: 'upload'};
 
 export function costUsd(usage = {}, model = MODEL) {
   const [input, output] = PRICES[Object.keys(PRICES).find(name => model.startsWith(name))] || [5, 25];
@@ -20,14 +20,15 @@ Skeleton format: each node is {t: tag, a: {attribute name: short value}, c: [cla
 Operators and the only parameters each accepts:
 - "toggle": a group of pressable options such as Yes/No. The operator looks for the options with the CSS selector params.option (default: "button[aria-pressed], [role=radio], button[aria-checked]"), picks the one whose visible text is the answer, clicks it, then reads whether it is on: params.onAttr (one of aria-pressed, aria-checked, aria-selected, data-state, data-selected) equal to params.onValue (a short word such as true, checked, active, on; default true).
 - "select": a custom dropdown. It clicks the control (or the element params.trigger inside it), waits for a list, finds the options with the selector params.option (default: "[role=option], [role=listbox] li, [class*=option]"), clicks the one matching the answer.
+- "upload": a slot that takes a file (the CV, a cover letter) but creates its file input only when something is pressed. The operator presses the element params.trigger (a selector inside the slot; default: the first pressable in it, usually a + or attach button), waits for a new file input, puts the file in and checks the page took it. The meaning of the slot (which file goes in) is decided elsewhere; you only say what opens it.
 - "date": a text field that takes a typed date. params.order is one of "mdy", "dmy", "ymd" and params.sep one of "/", ".", "-".
 
-Failure reasons and what they usually mean: 'no "X" option' or 'no option "X"' -> params.option does not match the real options, give a selector that does; 'the option did not stay selected' -> wrong onAttr/onValue; 'the list did not open' -> wrong params.trigger; 'the choice did not show' or 'the field did not keep the date' -> the format or the confirmation differs.
+Failure reasons and what they usually mean: 'no "X" option' or 'no option "X"' -> params.option does not match the real options, give a selector that does; 'the option did not stay selected' -> wrong onAttr/onValue; 'the list did not open' -> wrong params.trigger; 'the choice did not show' or 'the field did not keep the date' -> the format or the confirmation differs; 'no file input appeared' -> params.trigger is not the control that opens the file picker, give the selector of the one that does; 'the page did not show the file' or 'the page cleared the file' -> skip unless the skeleton clearly shows another input to use.
 
 Rules: selectors may use only tag names, classes (.name), attribute selectors ([name], [name="value"]), :not(), and the combinators space and >, at most 160 characters, built ONLY from tags, attribute names and class words that appear in the skeleton. Never target submit, send, apply, or form-level elements. Never invent attributes. If the skeleton does not support a confident recipe, skip.
 
 Reply with ONE JSON object and nothing else:
-{"operator": "toggle" | "select" | "date", "params": {...}, "reason": "one short sentence"}
+{"operator": "toggle" | "select" | "date" | "upload", "params": {...}, "reason": "one short sentence"}
 or {"skip": true, "reason": "one short sentence"}`;
 
 export function buildMessage(target) {

@@ -95,6 +95,17 @@ test('a dry run files nothing; the budget stops a run; a model or network error 
   assert.match(failed.results[0].why, /error: Anthropic 400/);
 });
 
+test('an upload slot that failed with no file input is proposed a trigger, validated by the shared schema', () => {
+  const answer = {operator: 'upload', params: {trigger: '.addAttachments'}, reason: 'the + opens the file picker'};
+  const upload = target({kind: 'upload', question: '', whys: ['no file input appeared']});
+  const decided = decide({target: upload, answer, validateRecipe});
+  assert.equal(decided.action, 'submit', JSON.stringify(decided));
+  assert.deepEqual(decided.recipe.params, {trigger: '.addAttachments'});
+  assert.match(SYSTEM, /"upload"/);
+  assert.equal(decide({target: upload, answer: {operator: 'upload', params: {trigger: 'button[type=submit]'}}, validateRecipe}).action, 'skip', 'never a submit control');
+  assert.equal(decide({target: upload, answer: {operator: 'select', params: {trigger: '.x'}}, validateRecipe}).action, 'skip', 'the operator must fit the kind');
+});
+
 test('a kind no operator handles (an unread question, a switch) is skipped without a model call', async () => {
   const {fetcher, calls} = network([JSON.stringify(good)], [target({kind: 'question', fingerprint: 'unread01'}), target({kind: 'switch', fingerprint: 'switch01'})]);
   const summary = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher});
