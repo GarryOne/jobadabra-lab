@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {test} from 'node:test';
 import {pathToFileURL} from 'node:url';
-import {AUTO_MIN_INSTALLS, BUTTON_SYSTEM, BUTTON_VERIFY, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
+import {AUTO_MIN_INSTALLS, BUTTON_SYSTEM, costUsd, BUTTON_VERIFY, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 import {decide as approve} from './approve.mjs';
 import {run} from './proposer.mjs';
 
@@ -77,7 +77,10 @@ test('a dry run files nothing, the budget stops a run, a model error skips inste
   await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: dry.fetcher, dry: true});
   assert.equal(dry.calls.put.length, 0);
   const capped = network([JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}'], many);
-  assert.ok((await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: capped.fetcher, budget: 0.0008})).considered < 6);
+  // The budget is two targets' worth at the model's own price (9 Oct 2026: a fixed $0.0008 stopped nothing once the learners moved to a
+  // model ten times cheaper, and the scheduled run failed on this test).
+  const perCall = costUsd({input_tokens: 600, output_tokens: 30});
+  assert.ok((await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: capped.fetcher, budget: perCall * 2 * 2})).considered < 6);
   const broken = async url => (url.includes('targets') ? {ok: true, json: async () => ({targets: [target()], sensitive: SENSITIVE})} : {ok: false, status: 400});
   assert.match((await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: broken})).results[0].why, /error: Anthropic 400/);
 });
