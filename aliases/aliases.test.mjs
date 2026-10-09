@@ -57,7 +57,7 @@ function network(replies, targets, buttonTargets = [], fixTargets = [], uploadTa
     if (url.includes('/api/aliases?targets=buttons')) return json({targets: buttonTargets, sensitive: []});
     if (url.includes('/api/aliases')) { calls.put.push(JSON.parse(init.body)); return json({ok: true, stored: 1}); }
     const text = replies[Math.min(calls.model++, replies.length - 1)];
-    return json({content: [{text}], usage: {input_tokens: 600, output_tokens: 30}});
+    return json({content: [{type: 'text', text}], usage: {input_tokens: 600, output_tokens: 30}});
   };
   return {fetcher, calls};
 }
@@ -149,4 +149,21 @@ test('an upload slot title nobody could place gets the file it asks for, verifie
   assert.deepEqual(calls.put.find(p => p.reviewed).reviewed, [{label: 'pièces annexes'}]);
   const decided = decideUpload({target: {label: 'lettre', installs: 1}, proposal: {file: 'cover_letter'}, verdict: {yes: true}, validateAlias: schema.validateAlias});
   assert.deepEqual([decided.action, decided.alias.key], ['candidate', 'cover_letter'], 'too few installs: a candidate for the owner');
+});
+
+// 9 Oct 2026: every alias call failed with Anthropic 400 (temperature sent to Haiku 5.5); a thinking block may come before the text.
+test('the request has no temperature and room to think; the text block is read even after a thinking block', async () => {
+  const bodies = [];
+  const fetcher = async (url, init = {}) => {
+    if (url.includes('api.anthropic.com')) {
+      bodies.push(JSON.parse(init.body));
+      return {ok: true, status: 200, json: async () => ({content: [{type: 'thinking', thinking: '…'}, {type: 'text', text: JSON.stringify({key: 'location', phrase: 'ville'})}], usage: {input_tokens: 10, output_tokens: 5}})};
+    }
+    if (url.includes('targets')) return {ok: true, status: 200, json: async () => ({targets: [target()], sensitive: SENSITIVE})};
+    return {ok: true, status: 200, json: async () => ({})};
+  };
+  await run({ownerKey: 'k', apiKey: 'a', schema, fetcher, dry: true});
+  assert.ok(bodies.length > 0);
+  assert.equal(bodies[0].temperature, undefined);
+  assert.ok(bodies[0].max_tokens >= 1000);
 });

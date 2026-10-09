@@ -14,11 +14,13 @@ const SITE = 'https://www.jobpilotto.workers.dev';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
 
 async function ask(fetcher, apiKey, system, content) {
-  const body = JSON.stringify({model: MODEL, max_tokens: 200, temperature: 0, system, messages: [{role: 'user', content}]});
+  // As the recipe proposer (7f6bb32): Haiku 5.5 rejects temperature (400) and thinks first, so room for that and the text block is read
+  // (9 Oct 2026: every alias call failed with Anthropic 400 once the learner had targets to ask about).
+  const body = JSON.stringify({model: MODEL, max_tokens: 1500, output_config: {effort: 'low'}, system, messages: [{role: 'user', content}]});
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await fetcher('https://api.anthropic.com/v1/messages', {method: 'POST', body,
       headers: {'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}});
-    if (response.ok) { const data = await response.json(); return {text: data.content?.[0]?.text || '', usage: data.usage || {}}; }
+    if (response.ok) { const data = await response.json(); return {text: data.content?.find(block => block.type === 'text')?.text || '', usage: data.usage || {}}; }
     if (![429, 500, 502, 503, 529].includes(response.status)) throw new Error(`Anthropic ${response.status}`);
     await new Promise(resolve => setTimeout(resolve, 1500));
   }
