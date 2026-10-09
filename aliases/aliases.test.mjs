@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {test} from 'node:test';
 import {pathToFileURL} from 'node:url';
-import {AUTO_MIN_INSTALLS, BUTTON_SYSTEM, costUsd, BUTTON_VERIFY, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
+import {AUTO_MIN_INSTALLS, AUTO_APPROVE, setAutoApprove, BUTTON_SYSTEM, costUsd, BUTTON_VERIFY, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 import {decide as approve} from './approve.mjs';
 import {run} from './proposer.mjs';
 
@@ -16,6 +16,9 @@ const schema = await import(pathToFileURL(path.join(dir, 'alias-schema.js')).hre
 const SENSITIVE = schema.SENSITIVE;
 const target = (extra = {}) => ({label: 'ort der herkunft', kind: 'text', n: 12, installs: 6, boards: ['lever'], ...extra});
 const judge = (proposal, verdict = {yes: true}, t = target()) => decide({target: t, proposal, verdict, sensitive: SENSITIVE, validateAlias: schema.validateAlias, aliasKey: schema.aliasKey});
+
+// The tests below are the owner-held rule (AUTO_APPROVE off, as once there is an approval screen); the last test is today's switch.
+setAutoApprove(false);
 
 test('a confirmed, non-sensitive meaning reported by enough installs starts a canary', () => {
   const d = judge({key: 'location', phrase: 'ort der herkunft'}, {yes: true}, target());
@@ -166,4 +169,16 @@ test('the request has no temperature and room to think; the text block is read e
   assert.ok(bodies.length > 0);
   assert.equal(bodies[0].temperature, undefined);
   assert.ok(bodies[0].max_tokens >= 1000);
+});
+
+// TEMPORARY (owner, 9 Oct 2026: auto-approve): a confirmed meaning goes live at once, a sensitive field and a single install included;
+// an unconfirmed one still waits.
+test('auto-approve (on today): confirmed meanings go live, sensitive and single-install ones too; unconfirmed ones still wait', () => {
+  setAutoApprove(true);
+  try {
+    assert.equal(AUTO_APPROVE(), true);
+    const one = target({installs: 1});
+    assert.equal(decide({target: one, proposal: {key: 'place_of_origin', phrase: 'ort der herkunft'}, verdict: {yes: true}, sensitive: SENSITIVE, validateAlias: schema.validateAlias, aliasKey: schema.aliasKey}).action, 'canary');
+    assert.equal(decide({target: one, proposal: {key: 'place_of_origin', phrase: 'ort der herkunft'}, verdict: {yes: false}, sensitive: SENSITIVE, validateAlias: schema.validateAlias, aliasKey: schema.aliasKey}).action, 'candidate');
+  } finally { setAutoApprove(false); }
 });

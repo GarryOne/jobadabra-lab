@@ -1,7 +1,7 @@
 // The alias proposer's decisions, kept apart from the network so they can be tested (proposer.mjs runs them).
 // A target is a question's wording that several installs reported and no alias places yet (GET /api/aliases?targets=1). A small model says
 // which profile field it means, if any; a second, independent pass checks the mapping; the shared validator and a containment check have the
-// last word. Sensitive fields (birth date, address ...) are never rolled out by this script: they stay candidates until the owner approves.
+// last word. Sensitive fields (birth date, address ...) stay candidates until the owner approves, except while AUTO_APPROVE is on (below).
 import {MODEL, costUsd} from '../proposer/proposer-lib.mjs';
 export {MODEL, costUsd};
 
@@ -46,6 +46,13 @@ export function parseJson(text) {
 
 // Enough independent reports before an alias may start a canary on its own.
 export const AUTO_MIN_INSTALLS = 5;
+// TEMPORARY (owner, 9 Oct 2026: "auto-approve, auto-confirmation ... temporarily"): there is no screen to approve on yet and one install, so a
+// meaning both AI passes confirm goes live at once, a sensitive field included, whatever the number of installs. Still held: what the second
+// pass does not confirm, and a wording people keep changing by hand (proposer.mjs). The site's judge halts what fails in real use.
+// TURN OFF (false) once the owner has an approval screen or the user base is larger: then sensitive fields wait for the owner again.
+let autoApprove = true;
+export const AUTO_APPROVE = () => autoApprove;
+export const setAutoApprove = on => { autoApprove = !!on; };   // tests of the owner-held rule
 
 // -> {action: 'candidate' | 'canary' | 'skip', alias?, why?}
 export function decide({target, proposal, verdict, validateAlias, aliasKey, sensitive = []}) {
@@ -55,8 +62,8 @@ export function decide({target, proposal, verdict, validateAlias, aliasKey, sens
   if (!checked.ok) return {action: 'skip', why: `invalid alias: ${checked.error}`};
   if (aliasKey(target.label, [checked.alias]) !== checked.alias.key) return {action: 'skip', why: 'the phrase is not in the wording'};
   if (verdict?.yes !== true) return {action: 'candidate', alias: checked.alias, why: 'the second check did not confirm it'};
-  if (sensitive.includes(checked.alias.key)) return {action: 'candidate', alias: checked.alias, why: 'sensitive field: needs the owner'};
-  if ((target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
+  if (!AUTO_APPROVE() && sensitive.includes(checked.alias.key)) return {action: 'candidate', alias: checked.alias, why: 'sensitive field: needs the owner'};
+  if (!AUTO_APPROVE() && (target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
   return {action: 'canary', alias: checked.alias};
 }
 
@@ -76,7 +83,7 @@ export function decideButton({target, proposal, verdict, validateAlias}) {
   const checked = validateAlias({key: 'apply_button', phrase: target.label});
   if (!checked.ok) return {action: 'skip', why: `invalid alias: ${checked.error}`};
   if (verdict?.yes !== true) return {action: 'candidate', alias: checked.alias, why: 'the second check did not confirm it'};
-  if ((target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
+  if (!AUTO_APPROVE() && (target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
   return {action: 'canary', alias: checked.alias};
 }
 
@@ -95,6 +102,6 @@ export function decideUpload({target, proposal, verdict, validateAlias}) {
   const checked = validateAlias({key: proposal.file, phrase: target.label});
   if (!checked.ok) return {action: 'skip', why: `invalid alias: ${checked.error}`};
   if (verdict?.yes !== true) return {action: 'candidate', alias: checked.alias, why: 'the second check did not confirm it'};
-  if ((target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
+  if (!AUTO_APPROVE() && (target.installs || 0) < AUTO_MIN_INSTALLS) return {action: 'candidate', alias: checked.alias, why: `only ${target.installs} installs reported it`};
   return {action: 'canary', alias: checked.alias};
 }

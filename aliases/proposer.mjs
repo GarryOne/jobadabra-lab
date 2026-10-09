@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
+import {AUTO_APPROVE, BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 
 const SITE = 'https://www.jobpilotto.workers.dev';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
@@ -88,7 +88,7 @@ export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3
     if (decision.action === 'skip' && /^(model:|invalid alias|the phrase is not)/.test(decision.why || '')) reviewed.push({label: target.label});   // not looked at again for a month
     if (decision.alias && !dry) {
       const put = await fetcher(`${site}/api/aliases`, {method: 'PUT', headers: owner, body: JSON.stringify({items: [decision.alias], source: 'proposer',
-        status: decision.action === 'canary' ? 'canary' : 'candidate', rollout: 5, note: (decision.why || `${target.installs} installs, ${target.n} times`).slice(0, 150)})});
+        status: decision.action === 'canary' ? 'canary' : 'candidate', rollout: 5, ...(decision.action === 'canary' && AUTO_APPROVE() ? {approved: true} : {}), note: (decision.why || `${target.installs} installs, ${target.n} times`).slice(0, 150)})});
       if (!put.ok) decision = {action: 'skip', why: `site refused: HTTP ${put.status}`};
     }
     summary[decision.action === 'skip' ? 'skipped' : decision.action]++;
