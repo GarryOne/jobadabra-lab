@@ -1,6 +1,6 @@
 ---
 name: notion-map
-description: Map of the Job Pilotto Notion workspace (page and database IDs, what lives where). Use at the start of a fresh session, or whenever you need to find or link a specific Notion page/database without searching from scratch. Structural reference only — for the project's current state, open the Session Handoff page listed below first.
+description: Map of the Job Pilotto Notion workspace (page and database IDs, what lives where). Use at the start of a fresh session, or whenever you need to find or link a specific Notion page/database without searching from scratch. Structural reference only; no Notion page is read at session start (owner, 11 Oct 2026).
 ---
 
 # Job Pilotto — Notion structure
@@ -8,21 +8,20 @@ description: Map of the Job Pilotto Notion workspace (page and database IDs, wha
 IDs below are stable (Notion page/database IDs don't change on rename or move); titles can drift.
 If a fetch 404s or the title looks wrong, `notion-search` for the title and update this file.
 
-**First move in a fresh session:** fetch **Session Handoff** below — it has current state, open
-threads and gotchas that this file doesn't try to duplicate. This file is the map; that page is
-the state.
+**No page is read at session start** (owner, 11 Oct 2026): fetch a page only when the task needs it. The project's
+state lives in the repo (CLAUDE.md, docs/rules/, the specs' `## Progress` checklists) and its history in commit messages.
+The Session Handoff and the Run Log were retired on 11 Oct 2026 and moved under 🗄️ Archive.
 
 ## Hierarchy
 
 ```
 🇨🇭 Job Pilotto — Project Hub (3e462be8fd86816ebef1c94a62a56c20)   (reorganized 29 Sep 2026: why / what / for whom / how / what happened)
-├── Session Handoff — Start Here (for Claude) (3e562be8fd8681af9a4dd8732964fd94)
 ├── 🧭 Strategy (3ea62be8fd868178a491d0dbe02b6a14)   [shared with the Job Pilotto Brain connection]
 │   ├── 📍 Product Compass (3ea62be8fd868115b9c5ef86331b72cb) (the owner's phase, north star, goal, bets)
 │   ├── Marketing Strategy — Free vs Premium (3e862be8fd868172a5c7f1056b745d6e)
 │   ├── Market & Competitors [Simplify, Teal, Huntr, JobCopilot, LazyApply; pricing; positioning] (3e862be8fd8681d5bdc5d29d50e085ae)
 │   ├── 🧭 Product Brain · Decisions [database] (d415820e35ca481ab3957a46d2a5caf6)
-│   ├── Decision Log [database] (e4d099e66ee84f728d640d225f253210)
+│   ├── Decision Log [database] (e4d099e66ee84f728d640d225f253210) (only owner decisions that change what agents may do; read on demand)
 │   └── Application Strategy — Decision and Automation Map (3e562be8fd8681e68244d641a0a200e1)
 ├── 🗺️ Product (3ea62be8fd86813d8a20dc5492caae2a)   [shared with the Job Pilotto Brain connection]
 │   ├── ✨ Feature catalog (3e962be8fd868133aa3ed99f1b0debcd)
@@ -42,10 +41,11 @@ the state.
 ├── 📈 Progress (3e562be8fd86814baa1bd914ae8f8c69)   (was 3 · Progress)   [shared with the Job Pilotto Brain connection]
 │   ├── Rollout — 1% to 100% [database] (6051151f0cc34c00b02007d467d92ba6)
 │   ├── Rollout Guide — Acceptance Gates and Next Sprint (3e462be8fd8681eb914ee988de2c8e5a)
-│   ├── Run Log (3e462be8fd868196b353cd0f0886ce57)
-│   │   └── Run Log archive — 24–28 Sep 2026 (3ea62be8fd868132afabca700bb4c5aa) (Run Log keeps ~1 week; move older entries to an archive subpage)
 │   └── Costs — Spending and Free-Tier Limits (3e562be8fd868106bb17d4bea0723fce)
 └── 🗄️ Archive (3ea62be8fd86816c82d8fd62e966a057)
+    ├── Session Handoff — Start Here (for Claude) (3e562be8fd8681af9a4dd8732964fd94) (retired 11 Oct 2026)
+    ├── Run Log (3e462be8fd868196b353cd0f0886ce57) (retired 11 Oct 2026; history = commit messages)
+    │   └── Run Log archive — 24–28 Sep 2026 (3ea62be8fd868132afabca700bb4c5aa)
     ├── Archive (old Source Registry [database], 319f2372dd8649699415b672d3111d4c — not read by code)
     └── [Backup, Obsolete] 1 · Job Search (3e562be8fd8681439762d07ec7042f7b)
         ├── Applications — Job Tracker [database] (f56b68942d3b43cbb85a7b1ebfe2df1b)
@@ -64,10 +64,10 @@ the state.
 
 | Need | Page/database |
 |---|---|
-| Resuming a session, current state, open threads, gotchas | Session Handoff (`...8fd94`) |
+| Resuming work, current state, open threads | the repo: CLAUDE.md, docs/rules/, the spec's `## Progress` (the Session Handoff is retired) |
 | How the pipeline works (modules, modes, AI stages, kit, feeds) | Technical Reference (`...dc83dc`) |
-| Why a decision was made, alternatives rejected | Decision Log database (`e4d099e6...`) |
-| Dated history of every change, commit references | Run Log (`...86ce57`) |
+| Why an owner decision was made, alternatives rejected | Decision Log database (`e4d099e6...`), read on demand |
+| Dated history of every change | `git log` (the Run Log is retired, archived) |
 | Competitors, their prices, where Job Pilotto differs | Market & Competitors (`...e085ae`) |
 | Milestone status, what's Done vs In progress, key numbers | 📈 Progress (`...ae8f8c69`) + Rollout database |
 | The product's phase, goal and bets (what to work on) | 📍 Product Compass (`...86331b72cb`) in 🧭 Strategy |
