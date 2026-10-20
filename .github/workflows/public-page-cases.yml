@@ -1,0 +1,68 @@
+name: Lab · page cases on public
+# The recorded-page replays of the public app, run here (repo split, owner 20 Oct 2026: the pool moves to this private repo; private reads public,
+# never the reverse). Builds the tree with tools/public-tree.sh (public at a ref + this repo's files at the same paths) and runs the same steps as
+# the public page-cases.yml. Phase 0: the cases are still in the public repo, so this proves the private runner (time, minutes) before anything
+# moves. From phase 1 public PRs start it (public_ref = the PR head) and it posts "Lab · page cases" on that commit.
+on:
+  workflow_dispatch:
+    inputs:
+      public_ref:
+        description: 'public job-pilotto ref: main, a branch or a commit sha'
+        default: 'main'
+      window:
+        description: 'quick = what a pull request runs; full = the whole window'
+        default: 'quick'
+        type: choice
+        options: [quick, full]
+
+concurrency:
+  group: public-page-cases-${{ inputs.public_ref }}
+  cancel-in-progress: true
+
+env:
+  JP_REPLAY_SHARD_COUNT: 2
+
+jobs:
+  replay:
+    name: page cases ${{ matrix.shard }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: lab
+      - name: The tree (public @ ref + the lab's files)
+        run: bash lab/tools/public-tree.sh tree "${{ inputs.public_ref }}"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install the tests
+        working-directory: tree/desktop/e2e
+        run: npm ci || npm install
+      - name: Install the app's own packages
+        working-directory: tree/desktop
+        run: npm ci --omit=dev --ignore-scripts || npm install --omit=dev --ignore-scripts
+      - name: Chromium (the real extension needs the full browser)
+        working-directory: tree/desktop/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Replay this shard's recorded cases
+        working-directory: tree/desktop/e2e
+        env:
+          JP_REPLAY: 1
+          JP_REPLAY_TABS: 4
+          JP_REPLAY_WINDOW: ${{ inputs.window }}
+          JP_REPLAY_SHARD: ${{ matrix.shard }}/${{ env.JP_REPLAY_SHARD_COUNT }}
+          JP_REPLAY_RESULTS: replay-results-${{ matrix.shard }}.json
+        run: node --test --test-concurrency=1 test/recorded-pages.test.mjs
+      - name: Keep this shard's results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: replay-results-${{ matrix.shard }}
+          path: tree/desktop/e2e/replay-results-${{ matrix.shard }}.json
+          if-no-files-found: ignore
+          retention-days: 3
