@@ -4,6 +4,8 @@ name: Lab · page cases on public
 # the public page-cases.yml. Phase 0: the cases are still in the public repo, so this proves the private runner (time, minutes) before anything
 # moves. From phase 1 public PRs start it (public_ref = the PR head) and it posts "Lab · page cases" on that commit.
 on:
+  pull_request:   # a change to this proof runs it once on public main
+    paths: ['.github/workflows/public-page-cases.yml', 'tools/public-tree.sh']
   workflow_dispatch:
     inputs:
       public_ref:
@@ -16,7 +18,7 @@ on:
         options: [quick, full]
 
 concurrency:
-  group: public-page-cases-${{ inputs.public_ref }}
+  group: public-page-cases-${{ github.head_ref || inputs.public_ref }}
   cancel-in-progress: true
 
 env:
@@ -36,7 +38,7 @@ jobs:
         with:
           path: lab
       - name: The tree (public @ ref + the lab's files)
-        run: bash lab/tools/public-tree.sh tree "${{ inputs.public_ref }}"
+        run: bash lab/tools/public-tree.sh tree "${{ inputs.public_ref || 'main' }}"
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -54,7 +56,7 @@ jobs:
         env:
           JP_REPLAY: 1
           JP_REPLAY_TABS: 4
-          JP_REPLAY_WINDOW: ${{ inputs.window }}
+          JP_REPLAY_WINDOW: ${{ inputs.window || 'quick' }}
           JP_REPLAY_SHARD: ${{ matrix.shard }}/${{ env.JP_REPLAY_SHARD_COUNT }}
           JP_REPLAY_RESULTS: replay-results-${{ matrix.shard }}.json
         run: node --test --test-concurrency=1 test/recorded-pages.test.mjs
