@@ -1,6 +1,6 @@
 {
- "_comment": "Real Swiss employer sites whose jobs the scout could read on 3 Oct 2026 (rules only, no AI, no browser). tools/scout_canary.py reads them weekly and fails when fewer than min_found still work: a site that changed its pages shows up here, not in the unit tests.",
- "min_found": 16,
+ "_comment": "Real Swiss employer sites whose jobs the scout could read on 3 Oct 2026 (rules only, no AI, no browser). tools/scout_canary.py reads them weekly and fails when fewer than min_found still work: a site that changed its pages shows up here, not in the unit tests. Added 21 Oct 2026: 12 sites of the thin kinds (hospitality, retail, schools, logistics) in FR, ES, PL, read by the same rules; min_found 16 of 25 became 24 of 37.",
+ "min_found": 24,
  "sites": [
   {
    "name": "Kantonsspital Baden AG",
@@ -101,6 +101,54 @@
   {
    "name": "Jenny Science AG",
    "website": "https://www.jennyscience.com/de"
+  },
+  {
+   "name": "Pullman (Accor) FR hospitality",
+   "website": "https://pullman.accor.com/"
+  },
+  {
+   "name": "Adagio City FR hospitality",
+   "website": "https://www.adagio-city.com/"
+  },
+  {
+   "name": "Four Seasons hospitality",
+   "website": "https://www.fourseasons.com/"
+  },
+  {
+   "name": "Desigual ES retail",
+   "website": "https://www.desigual.com/"
+  },
+  {
+   "name": "Electro Dépôt FR retail",
+   "website": "https://www.electrodepot.fr/"
+  },
+  {
+   "name": "C&A PL retail",
+   "website": "https://www.c-and-a.com/"
+  },
+  {
+   "name": "RIU ES hotels",
+   "website": "https://www.riu.com/"
+  },
+  {
+   "name": "IESE ES school",
+   "website": "https://www.iese.edu/"
+  },
+  {
+   "name": "EADA ES school",
+   "website": "https://www.eada.edu/"
+  },
+  {
+   "name": "EM Lyon FR school",
+   "website": "https://www.em-lyon.com/"
+  },
+  {
+   "name": "Poznań UE PL university",
+   "website": "https://ue.poznan.pl/"
+  },
+  {
+   "name": "Jet Aviation logistics",
+   "website": "https://www.jetaviation.com/"
   }
  ]
 }
