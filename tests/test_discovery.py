@@ -1,5 +1,5 @@
 """The private discovery (discovery/commoncrawl.py, discovery/priorities.py) and the canary tool, run against the public engine's code
-(JOB_PILOTTO_PUBLIC, default ~/job-pilotto). Fake archive answers only: no network."""
+(JOB_PILOTTO_PUBLIC, default ~/jobadabra). Fake archive answers only: no network."""
 import importlib.util
 import io
 import json

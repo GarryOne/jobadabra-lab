@@ -91,7 +91,7 @@ def issue_for(item):
         issues.append({'key': key, 'title': f"Fill failure: {site} · {label.strip()}"[:120], 'labels': ['fill-failure'], 'build': build,
                        'body': f"Reported from the app (extension build {build or '?'}): the owner's app and questions the reader did not read come at once, others once several installs report them.\n\n"
                                + line
-                               + "\n\nReplay fixture (red until fixed): `node tools/fill-fixture.mjs <this issue> --repo GarryOne/job-pilotto-internal` in the public repo. A dropdown whose options load from the site: record the site (skill record-applying-sites)."
+                               + "\n\nReplay fixture (red until fixed): `node tools/fill-fixture.mjs <this issue> --repo GarryOne/jobadabra-lab` in the public repo. A dropdown whose options load from the site: record the site (skill record-applying-sites)."
                                + f"\n\n<details><summary>Snapshot</summary>\n\n```json\n{json.dumps([field], indent=1)[:20000]}\n```\n</details>\n\n{marker(key)} {build_marker(build)}"})
     return issues
 
@@ -147,7 +147,7 @@ def close_stale(repo, dry, now=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--site', default=SITE)
-    parser.add_argument('--repo', default=os.environ.get('GITHUB_REPOSITORY', 'GarryOne/job-pilotto-internal'))
+    parser.add_argument('--repo', default=os.environ.get('GITHUB_REPOSITORY', 'GarryOne/jobadabra-lab'))
     parser.add_argument('--dry', action='store_true')
     options = parser.parse_args()
     key = os.environ.get('LAB_KEY', '')
