@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: GarryOne/job-pilotto
+          repository: GarryOne/jobadabra
           ref: main
       - name: This private repo (the site list and the tool)
         uses: actions/checkout@v4

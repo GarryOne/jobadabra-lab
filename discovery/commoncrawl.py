@@ -32,7 +32,11 @@ QUERIES = (
     ('ashby', 'url=jobs.ashbyhq.com/*'), ('workable', 'url=apply.workable.com/*'), ('recruitee', 'url=recruitee.com&matchType=domain'),
     ('personio', 'url=jobs.personio.de&matchType=domain'), ('teamtailor', 'url=teamtailor.com&matchType=domain'),
     ('smartrecruiters', 'url=jobs.smartrecruiters.com/*'), ('join', 'url=join.com/companies/*'), ('workday', 'url=myworkdayjobs.com&matchType=domain'),
+    # Every other address ats.detect reads (owner, 19 Oct 2026: "every job system ats.py knows"; tests/test_discovery.py checks the list).
+    ('umantis', 'url=umantis.com&matchType=domain'), ('greenhouse', 'url=boards.eu.greenhouse.io/*'), ('greenhouse', 'url=job-boards.eu.greenhouse.io/*'),
+    ('lever', 'url=jobs.eu.lever.co/*'), ('personio', 'url=jobs.personio.com&matchType=domain'), ('smartrecruiters', 'url=careers.smartrecruiters.com/*'),
 )
+FIRST_ELEVEN = QUERIES[:11]   # what a crawl marked read before 19 Oct 2026 covered: the rest of that crawl is read on the next run
 PAUSE_S = 1.5
 PRIORITY = 70          # a board known to exist: above guessed names, below Tier 1 and Swiss catalogs (the learned priorities adjust it)
 MAX_NEW = 3000         # candidates added per run, so one run never floods the queue
@@ -79,15 +83,29 @@ def boards(crawl, query, fetch=get, pause=PAUSE_S):
     return found
 
 
+def queries_read(db, crawl):
+    """The listings already read for this crawl: the record of each, or the first eleven when the crawl was marked read before it."""
+    row = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl_read'").fetchone()
+    try:
+        record = json.loads(row[0]) if row else {}
+    except ValueError:
+        record = {}
+    if record.get('crawl') == crawl:
+        return set(record.get('queries') or [])
+    done = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl'").fetchone()
+    return {query for _, query in FIRST_ELEVEN} if done and done[0] == crawl else set()
+
+
 def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     """Add the boards of the newest crawl not read yet. Returns {'crawl', 'boards', 'added'} (added 0 when this crawl was read before)."""
     db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
     crawl = crawl or latest_crawl(fetch)
-    done = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl'").fetchone()
-    if done and done[0] == crawl:
+    read = queries_read(db, crawl)
+    todo = [(system, query) for system, query in QUERIES if query not in read]
+    if not todo:
         return {'crawl': crawl, 'boards': 0, 'added': 0}
     found, failed = set(), []
-    for system, query in QUERIES:
+    for system, query in todo:
         try:
             got = boards(crawl, query, fetch, pause)
         except Exception as error:  # noqa: BLE001 — one job system's listing failing must not lose the others
@@ -96,6 +114,7 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
             continue
         print(f'{system}: {len(got)} boards')
         found |= got
+        read.add(query)
     known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
     known |= {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM feed_sources')}
     fresh = sorted(found - known)[:MAX_NEW]
@@ -103,7 +122,10 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     # separately and probe first the systems whose boards turn out to have roles in people's places.
     candidates = [dict(name=slug, origin=f'Common Crawl {system} {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
     added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
-    if not failed:   # a crawl counts as read only when every listing came through; else tomorrow's run tries again
+    # Each listing counts as read for this crawl once it came through, so a failed one, or a job system added later, is read on the next run;
+    # the crawl counts as read when all are.
+    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': sorted(read)}),))
+    if all(query in read for _, query in QUERIES):
         db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
     db.commit()
     return {'crawl': crawl, 'boards': len(found), 'added': added, 'failed': failed}
