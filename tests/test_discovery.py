@@ -91,7 +91,8 @@ class DiscoveryTests(unittest.TestCase):
         from src.sources import ats
         self.assertEqual({system for system, _ in ats.URL_PATTERNS} - {system for system, _ in self.cc.QUERIES}, set())
         hosts = {'umantis': 'https://recruitingapp-5181.umantis.com/Jobs/All', 'greenhouse': 'https://job-boards.eu.greenhouse.io/acme',
-                 'lever': 'https://jobs.eu.lever.co/acme', 'personio': 'https://acme.jobs.personio.com/', 'smartrecruiters': 'https://careers.smartrecruiters.com/Acme'}
+                 'lever': 'https://jobs.eu.lever.co/acme', 'personio': 'https://acme.jobs.personio.com/', 'smartrecruiters': 'https://careers.smartrecruiters.com/Acme',
+                 'oracle': 'https://acme.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/jobs'}
         for system, url in hosts.items():
             self.assertEqual(ats.detect(url)[0], system, url)
 
