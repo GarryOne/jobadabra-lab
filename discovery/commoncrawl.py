@@ -97,6 +97,23 @@ def queries_read(db, crawl):
     return {query for _, query in FIRST_ELEVEN} if done and done[0] == crawl else set()
 
 
+def keep(db, crawl, system, got, read, room):
+    """Register one listing's new boards as candidates and record the listing as read, now. Returns how many candidates were added.
+    The job system is part of the source's name ("Common Crawl workday"), so the learned priorities measure each system's yield
+    separately and probe first the systems whose boards turn out to have roles in people's places. A listing counts as read for this crawl once it
+    came through, so a failed one, or a job system added later, is read on the next run; the crawl counts as read when all are."""
+    known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
+    known |= {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM feed_sources')}
+    fresh = sorted(got - known)[:max(room, 0)]
+    candidates = [dict(name=slug, origin=f'Common Crawl {system} {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
+    added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
+    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': sorted(read)}),))
+    if all(query in read for _, query in QUERIES):
+        db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
+    db.commit()
+    return added
+
+
 def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     """Add the boards of the newest crawl not read yet. Returns {'crawl', 'boards', 'added'} (added 0 when this crawl was read before)."""
     db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
@@ -105,7 +122,7 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     todo = [(system, query) for system, query in QUERIES if query not in read]
     if not todo:
         return {'crawl': crawl, 'boards': 0, 'added': 0}
-    found, failed = set(), []
+    found, failed, added = set(), [], 0
     for system, query in todo:
         try:
             got = boards(crawl, query, fetch, pause)
@@ -116,19 +133,7 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
         print(f'{system}: {len(got)} boards')
         found |= got
         read.add(query)
-    known = {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM scout_candidates WHERE ats IS NOT NULL')}
-    known |= {(r[0], r[1]) for r in db.execute('SELECT ats, slug FROM feed_sources')}
-    fresh = sorted(found - known)[:MAX_NEW]
-    # The job system is part of the source's name ("Common Crawl workday"), so the learned priorities measure each system's yield
-    # separately and probe first the systems whose boards turn out to have roles in people's places.
-    candidates = [dict(name=slug, origin=f'Common Crawl {system} {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
-    added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
-    # Each listing counts as read for this crawl once it came through, so a failed one, or a job system added later, is read on the next run;
-    # the crawl counts as read when all are.
-    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': sorted(read)}),))
-    if all(query in read for _, query in QUERIES):
-        db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
-    db.commit()
+        added += keep(db, crawl, system, got, read, MAX_NEW - added)   # saved per listing: the step has a time cap, and a cut-off run kept nothing (24 Oct 2026: Oracle, last in line, was never reached)
     return {'crawl': crawl, 'boards': len(found), 'added': added, 'failed': failed}
 
 

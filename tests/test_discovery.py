@@ -112,6 +112,23 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(listed, {query for _, query in self.cc.QUERIES[11:]}, 'only the listings added since')
         self.assertEqual((first['crawl'], again['added'], again['boards']), ('CC-MAIN-2026-39', 0, 0))
 
+    def test_a_run_cut_off_by_the_steps_time_cap_keeps_the_listings_it_finished(self):
+        db = self.database()
+        urls = ['https://jobs.ashbyhq.com/acme', 'https://jobs.lever.co/gamma/abc']
+        inner = self.archive(urls)
+
+        def cut_off(url):   # the second listing never answers: the workflow's timeout kills the process (a BaseException here)
+            if 'jobs.lever.co' in url:
+                raise SystemExit('timeout')
+            return inner(url)
+        queries = (('ashby', 'url=jobs.ashbyhq.com/*'), ('lever', 'url=jobs.lever.co/*'))
+        with mock.patch.object(self.cc, 'QUERIES', queries), redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                self.cc.run(db, cut_off, pause=0)
+            again = self.cc.run(db, inner, pause=0)
+        self.assertEqual(again['added'], 1, 'the next run reads only the listing that was cut off')
+        self.assertEqual({r['slug'] for r in db.execute('SELECT slug FROM scout_candidates')}, {'acme', 'gamma'})
+
     def test_the_archive_is_asked_again_after_a_gateway_error(self):
         import urllib.error
         calls = []
