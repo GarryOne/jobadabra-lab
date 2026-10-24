@@ -1,5 +1,5 @@
 """Lab PRs follow the public repo's description convention (owner, 24 Oct 2026: lab #57 was a free-form body from a bare `gh pr create`).
-The lab's Actions can be blocked, so CLAUDE.md names the public ship tool as the gate and the workflow runs the public checker once they run."""
+The lab's Actions can be blocked, so CLAUDE.md names the public ship tool as the gate and the public lab-ci checks the description."""
 import unittest
 from pathlib import Path
 
@@ -13,13 +13,9 @@ class PrConventionTest(unittest.TestCase):
         self.assertIn('Never a bare `gh pr create`', text)
         self.assertIn('pr-body-template.md', text)
 
-    def test_a_workflow_runs_the_public_description_check_on_every_pr(self):
-        text = (ROOT / '.github' / 'workflows' / 'pr-body.yml').read_text()
-        self.assertIn('pull_request:', text)
-        self.assertIn('edited', text)
-        self.assertIn('repository: GarryOne/jobadabra', text)
-        self.assertIn('tools/pr-body-check.py', text)
-        self.assertIn('github.event.pull_request.body', text)
+    def test_the_description_check_runs_in_the_public_lab_ci_not_in_a_lab_workflow(self):
+        self.assertFalse((ROOT / '.github' / 'workflows' / 'pr-body.yml').exists(), 'a lab workflow cannot start until 1 Nov: a red X on every PR')
+        self.assertIn('lab-ci', (ROOT / 'CLAUDE.md').read_text())
 
 
 if __name__ == '__main__':
