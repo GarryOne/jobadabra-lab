@@ -86,6 +86,31 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual((first['added'], first['failed']), (1, ['ashby']))
         self.assertEqual(second['failed'], [], 'the crawl was not marked as read, so the next run tries again')
 
+    def test_every_job_system_the_engine_reads_from_an_address_is_asked_for(self):
+        """Owner, 19 Oct 2026: every job system ats.py knows, not the eleven startup ones; a new pattern there fails here until it has a query."""
+        from src.sources import ats
+        self.assertEqual({system for system, _ in ats.URL_PATTERNS} - {system for system, _ in self.cc.QUERIES}, set())
+        hosts = {'umantis': 'https://recruitingapp-5181.umantis.com/Jobs/All', 'greenhouse': 'https://job-boards.eu.greenhouse.io/acme',
+                 'lever': 'https://jobs.eu.lever.co/acme', 'personio': 'https://acme.jobs.personio.com/', 'smartrecruiters': 'https://careers.smartrecruiters.com/Acme'}
+        for system, url in hosts.items():
+            self.assertEqual(ats.detect(url)[0], system, url)
+
+    def test_a_crawl_read_before_new_systems_were_added_reads_only_those_next(self):
+        db = self.database()
+        db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+        db.execute("INSERT INTO scout_meta (key, value) VALUES ('commoncrawl', 'CC-MAIN-2026-39')")
+        asked = []
+        archive = self.archive([])
+        def fetch(url):
+            asked.append(url)
+            return archive(url)
+        with redirect_stdout(io.StringIO()):
+            first = self.cc.run(db, fetch, pause=0)
+            again = self.cc.run(db, fetch, pause=0)
+        listed = {url.split('-index?')[1].split('&output')[0] for url in asked if '-index?' in url}
+        self.assertEqual(listed, {query for _, query in self.cc.QUERIES[11:]}, 'only the listings added since')
+        self.assertEqual((first['crawl'], again['added'], again['boards']), ('CC-MAIN-2026-39', 0, 0))
+
     def test_the_archive_is_asked_again_after_a_gateway_error(self):
         import urllib.error
         calls = []
