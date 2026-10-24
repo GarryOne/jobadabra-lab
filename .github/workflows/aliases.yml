@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          repository: GarryOne/job-pilotto
+          repository: GarryOne/jobadabra
           path: public
       - uses: actions/setup-node@v4
         with: {node-version: 22}

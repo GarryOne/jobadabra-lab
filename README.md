@@ -1,6 +1,6 @@
 # Job Pilotto · internal (private)
 
-What makes the public product [GarryOne/job-pilotto](https://github.com/GarryOne/job-pilotto) smart and how it steers
+What makes the public product [GarryOne/jobadabra](https://github.com/GarryOne/jobadabra) smart and how it steers
 itself. Not published (Notion 🧭 Strategy → 💰 IP & Monetization, 🪜 Stages).
 
 | Here | What |

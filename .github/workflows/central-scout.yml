@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: GarryOne/job-pilotto
+          repository: GarryOne/jobadabra
           ref: main
       - name: This private repo (the curated seed lists and the discovery)
         uses: actions/checkout@v4

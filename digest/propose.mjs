@@ -51,7 +51,7 @@ export function issueBody(p, digest) {
     `- \`${w.id}\` · impact ${w.impact} · ${w.title}${w.byVersion?.length ? ` · per release: ${w.byVersion.map(v => `${v.version} ${v.per100 ?? '–'}`).join(', ')}` : ''}${w.evidence?.page ? ` · page: ${w.evidence.page}` : ''}`);
   return [`**Area:** ${p.area} · **confidence:** ${p.confidence} · digest ${digest.period.from} → ${digest.period.to}`, '', `## Change`, p.change, '',
     `## Evidence`, p.evidence, '', ...lines, '', `## How to prove it`, p.verify,
-    '', 'A reading failure gets a replay fixture first (public repo: `node tools/fill-fixture.mjs <triage issue> --repo GarryOne/job-pilotto-internal`), red until fixed.',
+    '', 'A reading failure gets a replay fixture first (public repo: `node tools/fill-fixture.mjs <triage issue> --repo GarryOne/jobadabra-lab`), red until fixed.',
     '', `_Proposed by the weekly form-learning pass (${MODEL}); a person decides._`, '', MARK(p.weaknesses.slice().sort().join('|'))].join('\n');
 }
 
@@ -81,7 +81,7 @@ function file(p, digest, repo, dry) {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2), option = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
   const site = option('site', 'https://www.jobpilotto.workers.dev'), dry = args.includes('--dry'), budget = Number(option('budget', '0.05'));
-  const repo = process.env.GITHUB_REPOSITORY || 'GarryOne/job-pilotto-internal';
+  const repo = process.env.GITHUB_REPOSITORY || 'GarryOne/jobadabra-lab';
   const result = {usd: 0, calls: 0, proposals: [], filed: []};
   const save = () => option('out') && fs.writeFileSync(option('out'), JSON.stringify(result, null, 1));
   const response = await fetch(`${site}/admin/form-filling/digest.json`, {headers: {Authorization: `Bearer ${process.env.LAB_KEY}`, 'User-Agent': 'job-pilotto-internal-form-learning'}});
