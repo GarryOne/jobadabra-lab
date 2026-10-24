@@ -164,6 +164,24 @@ class DiscoveryTests(unittest.TestCase):
             self.cc.run(db, fetch, pause=0, crawl=crawl)
         self.assertEqual(asked, ['lever', 'ashby'])
 
+    def test_a_listing_out_of_time_keeps_its_boards_and_the_next_listing_runs(self):
+        db = self.database()
+        urls = ['https://jobs.ashbyhq.com/acme', 'https://jobs.lever.co/gamma/abc']
+        inner = self.archive(urls)
+        ticks = iter(range(0, 10000, 200))   # every clock reading is 200 s later: past the listing's budget after its first page
+        queries = (('ashby', 'url=jobs.ashbyhq.com/*'), ('lever', 'url=jobs.lever.co/*'))
+
+        def fetch(url):
+            return json.dumps({'pages': 3}) if 'showNumPages' in url else inner(url)
+        with mock.patch.object(self.cc, 'QUERIES', queries), mock.patch.object(self.cc.time, 'monotonic', lambda: next(ticks)), \
+                mock.patch.object(self.cc.time, 'sleep'), redirect_stdout(io.StringIO()):
+            result = self.cc.run(db, fetch, pause=0)
+        self.assertEqual({r['slug'] for r in db.execute('SELECT slug FROM scout_candidates')}, {'acme', 'gamma'}, 'both listings ran, the partial one kept its boards')
+        record = json.loads(db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl_read'").fetchone()[0])
+        self.assertEqual(record['queries'], [], 'out-of-time listings are not marked read')
+        self.assertEqual(sorted(record['failed']), sorted(query for _, query in queries))
+        self.assertEqual(result['failed'], [])
+
     def test_the_archive_is_asked_again_after_a_gateway_error(self):
         import urllib.error
         calls = []
