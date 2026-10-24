@@ -1,0 +1,27 @@
+name: PR description
+# Every PR's description follows the owner's convention (verdict, Why, Unblocks, impact table, Before/After; public tools/pr-body-template.md),
+# the same check the public repo and jobadabra-web run. Private reads public: the checker is fetched from the public repo's main.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]   # edited: fixing the description re-runs the check
+
+permissions:
+  contents: read
+
+jobs:
+  description:
+    name: PR description laid out
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: GarryOne/jobadabra
+          ref: main
+          sparse-checkout: tools
+      - name: PR description laid out
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ endsWith(github.actor, '[bot]') && '' || github.event.pull_request.title }}   # the "[xx] " session tag
+        run: printf '%s' "$BODY" | python3 tools/pr-body-check.py
