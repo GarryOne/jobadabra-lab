@@ -97,7 +97,7 @@ def queries_read(db, crawl):
     return {query for _, query in FIRST_ELEVEN} if done and done[0] == crawl else set()
 
 
-def keep(db, crawl, system, got, read, room):
+def keep(db, crawl, system, got, read, room, failed=()):
     """Register one listing's new boards as candidates and record the listing as read, now. Returns how many candidates were added.
     The job system is part of the source's name ("Common Crawl workday"), so the learned priorities measure each system's yield
     separately and probe first the systems whose boards turn out to have roles in people's places. A listing counts as read for this crawl once it
@@ -107,11 +107,21 @@ def keep(db, crawl, system, got, read, room):
     fresh = sorted(got - known)[:max(room, 0)]
     candidates = [dict(name=slug, origin=f'Common Crawl {system} {crawl}', priority=PRIORITY, ats=system, slug=slug) for system, slug in fresh]
     added = scout.harvest(db, {'excluded': []}, [lambda: candidates])
-    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': sorted(read)}),))
+    db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': sorted(read), 'failed': sorted(failed)}),))
     if all(query in read for _, query in QUERIES):
         db.execute("INSERT OR REPLACE INTO scout_meta (key, value) VALUES ('commoncrawl', ?)", (crawl,))
     db.commit()
     return added
+
+
+def queries_failed(db, crawl):
+    """The listings that failed on the last run of this crawl: tried last next time, so one that always answers 504 cannot starve the ones behind it."""
+    row = db.execute("SELECT value FROM scout_meta WHERE key = 'commoncrawl_read'").fetchone()
+    try:
+        record = json.loads(row[0]) if row else {}
+    except ValueError:
+        record = {}
+    return set(record.get('failed') or []) if record.get('crawl') == crawl else set()
 
 
 def run(db, fetch=get, pause=PAUSE_S, crawl=None):
@@ -119,7 +129,8 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
     crawl = crawl or latest_crawl(fetch)
     read = queries_read(db, crawl)
-    todo = [(system, query) for system, query in QUERIES if query not in read]
+    avoided = queries_failed(db, crawl)
+    todo = sorted((item for item in QUERIES if item[1] not in read), key=lambda item: item[1] in avoided)   # stable: the failed ones go last (24 Oct 2026: greenhouse's 504s kept Oracle from ever running)
     if not todo:
         return {'crawl': crawl, 'boards': 0, 'added': 0}
     found, failed, added = set(), [], 0
@@ -129,11 +140,13 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
         except Exception as error:  # noqa: BLE001 — one job system's listing failing must not lose the others
             print(f'Warning: {system}: {type(error).__name__}: {error}')
             failed.append(system)
+            avoided.add(query)
+            keep(db, crawl, system, set(), read, 0, avoided - read)   # remembered now: the step may be cut off before the loop ends
             continue
         print(f'{system}: {len(got)} boards')
         found |= got
         read.add(query)
-        added += keep(db, crawl, system, got, read, MAX_NEW - added)   # saved per listing: the step has a time cap, and a cut-off run kept nothing (24 Oct 2026: Oracle, last in line, was never reached)
+        added += keep(db, crawl, system, got, read, MAX_NEW - added, avoided - read)   # saved per listing: the step has a time cap, and a cut-off run kept nothing (24 Oct 2026: Oracle, last in line, was never reached)
     return {'crawl': crawl, 'boards': len(found), 'added': added, 'failed': failed}
 
 
