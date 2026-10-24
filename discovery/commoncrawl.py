@@ -35,7 +35,25 @@ QUERIES = (
     # Every other address ats.detect reads (owner, 19 Oct 2026: "every job system ats.py knows"; tests/test_discovery.py checks the list).
     ('umantis', 'url=umantis.com&matchType=domain'), ('greenhouse', 'url=boards.eu.greenhouse.io/*'), ('greenhouse', 'url=job-boards.eu.greenhouse.io/*'),
     ('lever', 'url=jobs.eu.lever.co/*'), ('personio', 'url=jobs.personio.com&matchType=domain'), ('smartrecruiters', 'url=careers.smartrecruiters.com/*'),
-    ('oracle', 'url=*.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    # Oracle's career sites, one listing per region (the wide *.oraclecloud.com listing returned 15,000 URLs a page, mostly storage hosts, and 504ed: 24 Oct 2026).
+    ('oracle', 'url=*.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em1.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em3.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em4.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em5.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em6.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em7.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.em8.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us1.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us3.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us4.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us5.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us7.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.us8.oraclecloud.com/hcmUI/CandidateExperience/*'),
+    ('oracle', 'url=*.fa.ap1.oraclecloud.com/hcmUI/CandidateExperience/*'),
 )
 FIRST_ELEVEN = QUERIES[:11]   # what a crawl marked read before 19 Oct 2026 covered: the rest of that crawl is read on the next run
 PAUSE_S = 1.5
