@@ -33,6 +33,7 @@ jobs:
       - name: The proposer's own tests
         run: node --test proposer/proposer.test.mjs teach/teach.test.mjs
       - name: Propose recipes
+        shell: bash   # -eo pipefail: a failing job behind `| tee` fails the step (default bash -e returns tee's status)
         run: |
           flags=""
           if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi

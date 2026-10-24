@@ -34,6 +34,7 @@ jobs:
       - name: Its own tests
         run: node --test digest/propose.test.mjs
       - name: Propose improvements
+        shell: bash   # -eo pipefail: a failing job behind `| tee` fails the step (default bash -e returns tee's status)
         run: |
           flags=""
           if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi

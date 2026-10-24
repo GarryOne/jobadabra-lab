@@ -32,6 +32,7 @@ jobs:
       - name: The alias proposer's own tests
         run: node --test aliases/aliases.test.mjs
       - name: Propose meanings
+        shell: bash   # -eo pipefail: a failing job behind `| tee` fails the step (default bash -e returns tee's status)
         run: |
           flags=""
           if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi
