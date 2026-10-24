@@ -43,11 +43,13 @@ PRIORITY = 70          # a board known to exist: above guessed names, below Tier
 MAX_NEW = 3000         # candidates added per run, so one run never floods the queue
 
 
-RETRIES = 4
-BACKOFF_S = 15
+RETRIES = 3            # 24 Oct 2026: 4 tries of up to 120 s each let one 504ing listing use the whole step (3 of 45 s now); a slow archive is waited for across runs, not inside one
+BACKOFF_S = 10
+REQUEST_TIMEOUT_S = 45
+LISTING_BUDGET_S = 100   # one listing's pages, then the next listing gets its turn; what it found is kept and the rest is read on a later run
 
 
-def get(url, timeout=120, retries=RETRIES, backoff=BACKOFF_S):
+def get(url, timeout=REQUEST_TIMEOUT_S, retries=RETRIES, backoff=BACKOFF_S):
     """The archive's answer; its index is often slow (502/503/504, timeouts), so each request is tried a few times with a growing pause."""
     for attempt in range(retries):
         try:
@@ -65,12 +67,23 @@ def latest_crawl(fetch=get):
     return json.loads(fetch(f'{INDEX}/collinfo.json'))[0]['id']
 
 
-def boards(crawl, query, fetch=get, pause=PAUSE_S):
-    """{(ats, slug)} for one query over one crawl, all pages."""
+class Partial(Exception):
+    """A listing ran past its time budget: `found` holds the boards read so far (kept), the listing stays unread."""
+
+    def __init__(self, found):
+        super().__init__(f'{len(found)} boards so far, out of time')
+        self.found = found
+
+
+def boards(crawl, query, fetch=get, pause=PAUSE_S, budget_s=None):
+    """{(ats, slug)} for one query over one crawl, all pages. Raises Partial (with the boards so far) when `budget_s` runs out between pages."""
+    began = time.monotonic()
     base = f'{INDEX}/{crawl}-index?{query}&output=json&fl=url'
     pages = json.loads(fetch(base + '&showNumPages=true')).get('pages', 1)
     found = set()
     for page in range(pages):
+        if budget_s and found and time.monotonic() - began > budget_s:
+            raise Partial(found)
         time.sleep(pause)
         text = fetch(f'{base}&page={page}')   # a page that still fails after the retries fails this listing (tried again next run)
         for line in text.splitlines():
@@ -136,7 +149,13 @@ def run(db, fetch=get, pause=PAUSE_S, crawl=None):
     found, failed, added = set(), [], 0
     for system, query in todo:
         try:
-            got = boards(crawl, query, fetch, pause)
+            got = boards(crawl, query, fetch, pause, budget_s=LISTING_BUDGET_S)
+        except Partial as partial:   # its boards so far are kept; the listing is tried again, behind the others
+            print(f'{system}: {len(partial.found)} boards so far (out of time for this listing)')
+            found |= partial.found
+            avoided.add(query)
+            added += keep(db, crawl, system, partial.found, read, MAX_NEW - added, avoided - read)
+            continue
         except Exception as error:  # noqa: BLE001 — one job system's listing failing must not lose the others
             print(f'Warning: {system}: {type(error).__name__}: {error}')
             failed.append(system)
