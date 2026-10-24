@@ -129,6 +129,41 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(again['added'], 1, 'the next run reads only the listing that was cut off')
         self.assertEqual({r['slug'] for r in db.execute('SELECT slug FROM scout_candidates')}, {'acme', 'gamma'})
 
+    def test_a_listing_that_failed_last_time_is_tried_last(self):
+        db = self.database()
+        inner = self.archive(['https://jobs.ashbyhq.com/acme', 'https://jobs.lever.co/gamma/abc'])
+        order = []
+
+        def fetch(url):
+            if '-index?' in url and 'showNumPages' in url:
+                order.append('lever' if 'jobs.lever.co' in url else 'ashby')
+            if 'jobs.ashbyhq.com' in url and '-index?' in url:
+                raise OSError('504')
+            return inner(url)
+        queries = (('ashby', 'url=jobs.ashbyhq.com/*'), ('lever', 'url=jobs.lever.co/*'))
+        with mock.patch.object(self.cc, 'QUERIES', queries), mock.patch.object(self.cc.time, 'sleep'), redirect_stdout(io.StringIO()):
+            first = self.cc.run(db, fetch, pause=0)
+            order.clear()
+            self.cc.run(db, fetch, pause=0)
+        self.assertEqual(first['failed'], ['ashby'])
+        self.assertEqual(order, ['ashby'], 'only the failed one is left to read, and it is asked again')
+
+    def test_failed_listings_go_behind_the_ones_never_tried(self):
+        db = self.database()
+        crawl = 'CC-MAIN-2026-39'
+        db.execute('CREATE TABLE IF NOT EXISTS scout_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+        queries = (('ashby', 'url=jobs.ashbyhq.com/*'), ('lever', 'url=jobs.lever.co/*'))
+        db.execute("INSERT INTO scout_meta (key, value) VALUES ('commoncrawl_read', ?)", (json.dumps({'crawl': crawl, 'queries': [], 'failed': ['url=jobs.ashbyhq.com/*']}),))
+        asked = []
+
+        def fetch(url):
+            if '-index?' in url and 'showNumPages' in url:
+                asked.append('lever' if 'jobs.lever.co' in url else 'ashby')
+            return json.dumps({'pages': 0}) if 'showNumPages' in url else ''
+        with mock.patch.object(self.cc, 'QUERIES', queries), redirect_stdout(io.StringIO()):
+            self.cc.run(db, fetch, pause=0, crawl=crawl)
+        self.assertEqual(asked, ['lever', 'ashby'])
+
     def test_the_archive_is_asked_again_after_a_gateway_error(self):
         import urllib.error
         calls = []
