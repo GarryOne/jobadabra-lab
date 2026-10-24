@@ -29,4 +29,5 @@ jobs:
         with:
           python-version: '3.12'
       - name: Read the sites
+        shell: bash   # -eo pipefail: a failing job behind `| tee` fails the step (default bash -e returns tee's status)
         run: python ops/canary/scout_canary.py | tee "$GITHUB_STEP_SUMMARY"
