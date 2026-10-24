@@ -35,6 +35,7 @@ QUERIES = (
     # Every other address ats.detect reads (owner, 19 Oct 2026: "every job system ats.py knows"; tests/test_discovery.py checks the list).
     ('umantis', 'url=umantis.com&matchType=domain'), ('greenhouse', 'url=boards.eu.greenhouse.io/*'), ('greenhouse', 'url=job-boards.eu.greenhouse.io/*'),
     ('lever', 'url=jobs.eu.lever.co/*'), ('personio', 'url=jobs.personio.com&matchType=domain'), ('smartrecruiters', 'url=careers.smartrecruiters.com/*'),
+    ('oracle', 'url=*.oraclecloud.com/hcmUI/CandidateExperience/*'),
 )
 FIRST_ELEVEN = QUERIES[:11]   # what a crawl marked read before 19 Oct 2026 covered: the rest of that crawl is read on the next run
 PAUSE_S = 1.5
