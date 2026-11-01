@@ -62,6 +62,7 @@ class CentralScout(unittest.TestCase):
         self.assertIn('SCOUT_SERPAPI_KEY: ${{ secrets.CENTRAL_SCOUT_SERPAPI_KEY }}', self.text)
         self.assertNotIn('SERPAPI_API_KEY:', self.text, "that name turns on the role searches' SerpApi lane, outside the month cap")
 
+    @unittest.skipUnless((ENGINE / 'src' / 'scout_core.py').exists(), 'the public engine is not checked out next to this repo (lab-ci sets JOB_PILOTTO_PUBLIC, so it runs there)')
     def test_the_job_limit_covers_setup_both_budgets_and_the_publish_reserve(self):
         limit = int(re.search(r'timeout-minutes: (\d+)', self.text).group(1))
         setup, reserve = 6, 3   # minutes: checkout, installs, Common Crawl (3 min cap) before the scout; upload and cost report after
