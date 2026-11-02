@@ -25,6 +25,22 @@ def budget_seconds(name):
     return int(match.group(1)) * int(match.group(2))
 
 
+class EveryWorkflowIsValidYaml(unittest.TestCase):
+    def test_no_plain_value_holds_a_colon_and_space(self):
+        """Why (2 Nov 2026, rs): central-scout.yml had `- name: ... 2026: no App token`; a `: ` inside an unquoted value is a YAML error, so GitHub
+        showed "workflow file issue", ran no job and refused workflow_dispatch (422) until the line was reworded. PyYAML is not a lab dependency,
+        so this checks the class by text: a value that is not quoted, a block scalar or a flow collection may not contain `: `."""
+        bad = []
+        for path in sorted(WORKFLOWS.glob('*.yml')):
+            for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                match = re.match(r'^\s*(?:-\s+)?[\w.-]+:\s+(?P<value>\S.*)$', re.sub(r'\s#.*$', '', line))
+                if not match or re.match(r'''['"|>\[{&*!%@`]''', match['value']) or '${{' in line:
+                    continue
+                if ': ' in match['value']:
+                    bad.append(f'{path.name}:{number}: {line.strip()[:100]}')
+        self.assertEqual(bad, [], 'an unquoted ": " in a YAML value: quote the value or reword it')
+
+
 class CentralScout(unittest.TestCase):
     def setUp(self):
         self.text = (WORKFLOWS / 'central-scout.yml').read_text(encoding='utf-8')
