@@ -12,9 +12,10 @@ name: Central scout
 run-name: central scout${{ inputs.batch && format(' {0}', inputs.batch) || '' }}
 
 on:
-  # Why (1 Nov 2026, rs 6b/6): DORMANT until the switch PR (6b-4). The public repo still runs this job on its own schedule; two schedulers would publish the index twice. Start it by hand from this repo's Actions tab to prove the lab path.
-  # schedule:
-  #   - cron: '20 4,10,16,22 * * *'   # UTC, every 6 h
+  # Why (2 Nov 2026, rs 6b-4, owner: "jobadabra should have no web, no worker"): the public copy of this job is deleted (jobadabra#2962), so this is the only scheduler.
+  # Proven by hand first: run 41376186747, 40 broker calls answered, no oidc error, 3871 feeds published.
+  schedule:
+    - cron: '20 4,10,16,22 * * *'   # UTC, every 6 h
   workflow_dispatch:
     inputs:
       batch: {description: 'candidates to probe this run', required: false, default: '500'}

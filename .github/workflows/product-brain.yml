@@ -14,10 +14,11 @@ name: Product brain · Daily brief
 # Cost: a call is a share of the owner's weekly plan (the broker counts it), no dollars.
 
 on:
-  # Why (1 Nov 2026, rs 6b/6): DORMANT until the switch PR (6b-4). The public repo still runs this job on its own schedule; two schedulers would publish the index twice. Start it by hand from this repo's Actions tab to prove the lab path.
-  # schedule:
-  #   - cron: '0 5 * * *'   # daily brief: 07:00 Zurich in summer, 06:00 in winter
-  #   - cron: '0 16 * * 0'  # Sunday strategy review
+  # Why (2 Nov 2026, rs 6b-4, owner: "jobadabra should have no web, no worker"): the public copy of this job is deleted (jobadabra#2962), so this is the only scheduler.
+  # Proven by hand first: the owner's run 41378657847, brief posted to Notion.
+  schedule:
+    - cron: '0 5 * * *'   # daily brief: 07:00 Zurich in summer, 06:00 in winter
+    - cron: '0 16 * * 0'  # Sunday strategy review
   workflow_dispatch:
     inputs:
       step:
