@@ -29,6 +29,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 ACCOUNT, SERVICE = "jobadabra", "jobadabra.license.signing_key"
+# Why (2 Nov 2026, Gitar on lab #68): the rename moves the signing key's Keychain name; a Mac that has not run tools/keychain-copy-to-jobadabra.sh in the public repo
+# still holds the key under the old name, and `init` would mint a second key that no license verifies against. Not a fallback: init only refuses.
+OLD_SIGNING_ITEM = ("job-pilotto", "job-pilotto.license.signing_key")
 KINDS = ("founder", "friend", "pass")
 DATA = Path(__file__).resolve().parent.parent / "data"
 LEDGER, REVOCATIONS = "licenses.json", "revocations.json"
@@ -45,6 +48,10 @@ def unb64(text: str) -> bytes:
 def keychain_get() -> str | None:
     done = subprocess.run(["security", "find-generic-password", "-a", ACCOUNT, "-s", SERVICE, "-w"], capture_output=True, text=True)
     return done.stdout.strip() if done.returncode == 0 else None
+
+
+def old_signing_key_exists() -> bool:
+    return subprocess.run(["security", "find-generic-password", "-a", OLD_SIGNING_ITEM[0], "-s", OLD_SIGNING_ITEM[1]], capture_output=True).returncode == 0
 
 
 def keychain_set(value: str) -> None:
@@ -217,6 +224,8 @@ def main(argv=None) -> None:
     if args.command == "init":
         if keychain_get():
             sys.exit(f"A signing key already exists ({SERVICE}). Not replacing it: every key minted so far would stop verifying.")
+        if old_signing_key_exists():
+            sys.exit(f"The signing key is still under its old Keychain name. Copy it first (tools/keychain-copy-to-jobadabra.sh --go in the jobadabra repo); init would make a second key and every key minted so far would stop verifying.")
         seed = Ed25519PrivateKey.generate()
         keychain_set(b64(seed.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())))
         print(f"Signing key stored in the Keychain as {SERVICE}.\nPublic key (goes into desktop/lib/license.js): {public_b64(seed)}")
