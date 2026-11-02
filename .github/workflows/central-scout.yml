@@ -49,7 +49,7 @@ jobs:
           # Why (1 Nov 2026, rs 6b/6): the job moved here from the public repo, so "this repo" is the lab now; the engine is the other checkout. Owner from the variable, never a literal (org move, go-org-move-1e).
           repository: ${{ vars.OWNER_OF_JOBADABRA }}/jobadabra
           ref: main
-      - name: This repo (the curated seed lists and the discovery), public since 1 Nov 2026: no App token
+      - name: This repo (the curated seed lists and the discovery; public since 1 Nov 2026, so no App token)
         uses: actions/checkout@v5
         with:
           path: ops
