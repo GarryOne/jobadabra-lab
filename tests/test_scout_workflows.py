@@ -9,7 +9,7 @@ from pathlib import Path
 OPS = Path(__file__).resolve().parents[1]
 ENGINE = Path(os.getenv('JOBADABRA_PUBLIC') or Path.home() / 'jobadabra')
 WORKFLOWS = OPS / '.github' / 'workflows'
-ACTIVE = False   # Why (1 Nov 2026, rs 6b/6): flipped to True by the switch PR (6b-4), in the same commit that deletes the public copies; two schedulers would publish the index twice.
+ACTIVE = True   # Why (2 Nov 2026, rs 6b-4): the public copies are deleted (jobadabra#2962), so lab is the only scheduler; set back to False only together with removing the schedule: lines.
 
 
 def code(name):
@@ -54,7 +54,7 @@ class CentralScout(unittest.TestCase):
         self.assertNotIn('create-github-app-token', self.code, 'the lab is public since 1 Nov 2026: no App token to read it')
 
     def test_it_waits_for_the_switch(self):
-        self.assertEqual(bool(re.search(r'(?m)^\s{2}schedule:', self.code)), ACTIVE, 'dormant until 6b-4, then scheduled: both start by hand either way')
+        self.assertEqual(bool(re.search(r'(?m)^\s{2}schedule:', self.code)), ACTIVE, 'scheduled since 6b-4; both also start by hand')
         self.assertIn('workflow_dispatch:', self.code)
 
     def test_the_scout_keeps_its_places_between_runs(self):
