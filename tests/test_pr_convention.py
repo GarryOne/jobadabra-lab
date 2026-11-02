@@ -13,9 +13,14 @@ class PrConventionTest(unittest.TestCase):
         self.assertIn('Never a bare `gh pr create`', text)
         self.assertIn('pr-body-template.md', text)
 
-    def test_the_description_check_runs_in_the_public_lab_ci_not_in_a_lab_workflow(self):
-        self.assertFalse((ROOT / '.github' / 'workflows' / 'pr-body.yml').exists(), 'a lab workflow cannot start until 1 Nov: a red X on every PR')
-        self.assertIn('lab-ci', (ROOT / 'CLAUDE.md').read_text())
+    def test_the_description_check_is_the_org_pr_checks_workflow(self):
+        """Gitar on #73: the lab runs the org's pr-checks.yml (a call of jobadabra's reusable pr-body-check.yml) and CLAUDE.md names it."""
+        flow = (ROOT / '.github' / 'workflows' / 'pr-checks.yml').read_text()
+        self.assertIn('uses: jobadabra/jobadabra/.github/workflows/pr-body-check.yml@main', flow)
+        self.assertIn('name: All checks passed', flow)
+        text = (ROOT / 'CLAUDE.md').read_text()
+        self.assertIn('pr-checks.yml', text)
+        self.assertNotIn('The lab has no workflow for it', text)
 
 
 if __name__ == '__main__':
