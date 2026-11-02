@@ -12,7 +12,6 @@ KEPT = [
     re.compile(r'Job Pilotto Brain'),   # the Notion connection and the Telegram bot's display name, owned by the owner
     re.compile(r'jobpilotto\.(top|workers\.dev)'),   # the old domain and the workers.dev subdomain: infrastructure we still own
     re.compile(r'OLD_SIGNING_ITEM = |old Keychain name|keychain-copy-to-jobadabra'),   # the init guard names the signing key's old Keychain item to refuse
-    re.compile(r'secrets\.JOB_PILOTTO_'),   # a GitHub secret not yet copied to its new name
 ]
 
 
