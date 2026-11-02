@@ -1,6 +1,6 @@
 """Daily triage: pull the form-fill failures from the website's queue and file them as issues in THIS (private) repository.
 
-    python3 triage/triage.py [--site https://www.jobpilotto.workers.dev] [--dry]
+    python3 triage/triage.py [--site https://www.jobadabra.top] [--dry]
 
 Env: LAB_KEY (the site's owner key), GH_TOKEN (the workflow's, issues: write). The queue is filled by the site when a form-fill failure
 recurs (several senders or many reports, or the owner's own app), so a single report never becomes an issue. Pull, not push: the website
@@ -19,7 +19,7 @@ import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-SITE = 'https://www.jobpilotto.workers.dev'
+SITE = 'https://www.jobadabra.top'
 STALE_DAYS = 14
 BUILD = re.compile(r'<!-- triage-build:([\w.+-]+) -->')
 
@@ -155,7 +155,7 @@ def main():
         print('No LAB_KEY: nothing to do.')
         return
     # urllib's own User-Agent is blocked at Cloudflare's edge (403), so send ours
-    headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'User-Agent': 'job-pilotto-internal-triage'}
+    headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'User-Agent': 'jobadabra-internal-triage'}
     with urllib.request.urlopen(urllib.request.Request(f'{options.site}/api/triage', headers=headers), timeout=30) as response:
         items = json.load(response).get('items', [])
     print(f'{len(items)} item(s) in the queue')

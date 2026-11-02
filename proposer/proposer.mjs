@@ -10,7 +10,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {MODEL, OPERATOR_OF, SYSTEM, buildMessage, costUsd, decide, parseAnswer} from './proposer-lib.mjs';
 
-const SITE = 'https://www.jobpilotto.workers.dev';
+const SITE = 'https://www.jobadabra.top';
 const log = (...parts) => console.log(`[proposer] ${parts.join(' ')}`);
 
 async function ask(fetcher, apiKey, target) {

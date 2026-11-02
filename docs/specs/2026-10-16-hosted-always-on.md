@@ -2,11 +2,11 @@
 
 **Verdict:** a switch (Pro, and Free during the trial) "Search for me while my Mac is off" that runs the person's searches **on our Cloudflare Containers**, not on GitHub Actions. No GitHub, Notion or Telegram setup. New matches appear in the app (optional push/Telegram later). AI is debited from the Pro credit through the existing route. **Compute costs us about $0.0055 a run (measured in a container, 16 Oct 2026); the person is debited a flat $0.011 a run from their credit (or trial budget)**, the same rule as AI keys: their own resources are unlimited, ours are debited. Nothing is built; behind `HOSTED_ALWAYS_ON=off`, after Pro launches.
 
-Owner (16 Oct 2026, via job-pilotto-cc): "in the Pro version, can we offer users the GitHub Actions from the house, in their Credit? that would be a good selling point."
+Owner (16 Oct 2026, via jobadabra-cc): "in the Pro version, can we offer users the GitHub Actions from the house, in their Credit? that would be a good selling point."
 cc's answer, kept here: yes as a selling point, **not on our GitHub Actions** (GitHub's terms cover CI of a repo, not a compute service for many customers; the account all our CI depends on would be at risk; minutes cost; a shared concurrency limit; users' data would pass through our runs).
 
 ## History read first
-- Always on = the user's **own** private repo calling `GarryOne/job-pilotto/.github/workflows/daily.yml@main` with their secrets; set up by `desktop/lib/github.js` (`fd6357f` 28 Sep rename, `b1c5fcc` Google sign-in, `24ae4fd` 8 Oct kept in step at each start). Notion is required there (state also lives in a GitHub cache + artifact backup of `jobs.sqlite`).
+- Always on = the user's **own** private repo calling `GarryOne/jobadabra/.github/workflows/daily.yml@main` with their secrets; set up by `desktop/lib/github.js` (`fd6357f` 28 Sep rename, `b1c5fcc` Google sign-in, `24ae4fd` 8 Oct kept in step at each start). Notion is required there (state also lives in a GitHub cache + artifact backup of `jobs.sqlite`).
 - The store interface (`1e1eef0`, `src/stores/`: SQLite default, Notion adapter) means the engine already runs on a **SQLite store with no Notion**. That is what makes a hosted run possible.
 - Pro (`docs/superpowers/specs/2026-10-16-pro-plan.md`, PRs 1-2 on main): accounts, `pro_accounts`, credit ledger `pro_credit`, `pro-ai.js` lane on `/api/ai/v1/messages` (50/min only, $0.25 overdraft, no free fallback at 0).
 - Nothing in history built a hosted runner or a per-user cron; the site Worker has one daily cron (`30 5 * * *`) and the account has "no cron triggers left" on the Free-plan count (now Workers Paid: 250 allowed).
@@ -111,7 +111,7 @@ Prices: Cloudflare Containers (Workers Paid, 5 Oct 2026 docs): memory $0.0000025
   - **Not measured:** egress (the probe's `eth0` counter read 0, so the instrumentation was wrong; only request bytes leave the container, 1,068 feed requests, expected ≤ 5 MB, ≤ $0.0001) and the cgroup memory peak (path read 0). Cost per run used here: **≈ $0.0055** = $0.0051 measured + ≈ $0.0003 Worker/Queue/D1/R2 pennies + egress ≤ $0.0001.
   - **Surprises against the local run:** wall time 2x (276 s vs 147 s) and CPU 2.8x (110 s vs 39 s): `standard-1` is half a vCPU and the Linux image was slower than the Mac. Memory was as expected (≈ 1.1 GiB: `basic` at 1 GiB does not fit, `standard-1` stays). **The example search reads 1,068 employer feeds**; a typical user's smaller set, and conditional requests, would cut time and cost: the build session should measure a run with a realistic profile and an AI step before launch.
   - **Cleanup (checked):** the workflow deleted the Worker `jp-hosted-probe`; the container application `jp-hosted-probe-probe` and its image were deleted by hand right after (the workflow's delete does not remove them: the build plan's teardown must run `wrangler containers delete` and `containers images delete`). Nothing of the probe is left on the account. Spend: two runs of about 4.6 minutes each, under $0.02.
-- **Measured locally, 16 Oct 2026** (the engine, `JOB_PILOTTO_STORE=sqlite`, empty state, an isolated app folder and no keys, config = the repo's example search; a Mac, not a container): **147 s wall, 33 s user + 6 s system CPU (≈ 27% of one core), peak memory ≈ 0.8 GB (RSS) / 1.2 GB (macOS footprint)**, 1,068 employer feeds read, 8,883 jobs listed, 142 new, no AI. **Consequences for the estimate above:** `basic` (1 GiB) is too small, use **`standard-1` (1/2 vCPU, 4 GiB, 8 GB disk)**; a later run with a warm state reads the same feeds, so 147 s is the planning figure.
+- **Measured locally, 16 Oct 2026** (the engine, `JOBADABRA_STORE=sqlite`, empty state, an isolated app folder and no keys, config = the repo's example search; a Mac, not a container): **147 s wall, 33 s user + 6 s system CPU (≈ 27% of one core), peak memory ≈ 0.8 GB (RSS) / 1.2 GB (macOS footprint)**, 1,068 employer feeds read, 8,883 jobs listed, 142 new, no AI. **Consequences for the estimate above:** `basic` (1 GiB) is too small, use **`standard-1` (1/2 vCPU, 4 GiB, 8 GB disk)**; a later run with a warm state reads the same feeds, so 147 s is the planning figure.
   | Part (standard-1, 147 s) | Per run, measured basis |
   |---|---|
   | Memory 4 GiB × 147 s × $0.0000025 | $0.00147 |
@@ -126,7 +126,7 @@ Prices: Cloudflare Containers (Workers Paid, 5 Oct 2026 docs): memory $0.0000025
 - **Settings → Plan → "Search for me while my Mac is off"** (Pro only), one switch + frequency choice: **once a day (default)**, twice a day, every 4 hours (the cap, 6/day). Built from `choiceCards`/existing parts; ⌘K "Turn hosted search on/off"; sidebar line "Hosted search · next 14:00".
 - **What the person sees:** the Matches/Jobs screen shows new matches that arrived while the app was closed ("12 new while you were away"); Recent activity gets a "Hosted search" run card (same card as other search runs: count, top matches, AI cost as the credit bar). Notifications: see §4c.
 - **Credit at 0:** hosted runs **pause** (crawl-only runs are still cheap but the scoring needs AI; we pause the whole schedule, no unscored list), the card says "Paused: AI credit used up. Top up, or use your own key on this Mac." Resumes at the next top-up. Warnings at 30%/10% reuse the Pro ones.
-- **Own-repo Always on during the trial** stays; when the trial ends, GitHub Always on is Pro only (owner, 16 Oct; `job-pilotto-31` counts CI against the trial). A person may keep the GitHub path or switch to hosted; both on at once is refused (one schedule per account).
+- **Own-repo Always on during the trial** stays; when the trial ends, GitHub Always on is Pro only (owner, 16 Oct; `jobadabra-31` counts CI against the trial). A person may keep the GitHub path or switch to hosted; both on at once is refused (one schedule per account).
 
 ### 4b. Free trial users can try it (owner, 16 Oct 2026: "free users/trials should also be able to experience this")
 - **ON BY DEFAULT for trial users** (owner, 16 Oct 2026: "enable this by default, to catch them in the loop, to be present in their day-to-day life for a few weeks. This will increase the conversion rate").
@@ -148,7 +148,7 @@ Prices: Cloudflare Containers (Workers Paid, 5 Oct 2026 docs): memory $0.0000025
 | **App notification** (Mac/Windows) | v1 | on | none; for anyone with the app open, from the inbox pull |
 | **Telegram** | stays | option (the token and chat stay on the Mac; a hosted run reaches Telegram only if the person later connects it in a separate spec) | none |
 | **WhatsApp** | **after Pro launches** | off | Meta business verification and approved templates; cents per message, **debited from the credit** |
-- **Content:** the same "N new matches" card as Telegram (top matches with fit, one line each), each with a link that opens the job in the app (`jobpilotto://job/<id>`, falling back to the website's "open in the app" page).
+- **Content:** the same "N new matches" card as Telegram (top matches with fit, one line each), each with a link that opens the job in the app (`jobadabra://job/<id>`, falling back to the website's "open in the app" page).
 - **Frequency:** **one digest per run, never one message per job**; and **only when the run found new matches** (an empty run sends nothing). At most one email per 4 h even on the 4-h schedule; a day's second digest is merged if the first has not been opened. Quiet by design.
 - **Where the setting lives:** Settings → Plan → Hosted search → "Tell me by": Email (address shown, change it), App notifications, Telegram (existing). ⌘K "Hosted search: notifications". The address is the Pro account's e-mail; a trial user gives it in onboarding (§4b; stored with the schedule, deleted with it, §2).
 - **Unsubscribe:** every email has a one-click unsubscribe link (signed token, no sign-in) that turns the email channel off for that schedule (`List-Unsubscribe` header too), plus the switch in Settings. Turning the schedule off, deleting the data or ending the trial deletes the address.
@@ -175,7 +175,7 @@ Prices: Cloudflare Containers (Workers Paid, 5 Oct 2026 docs): memory $0.0000025
   Each email carries only its own list's links; a service mail never carries a promotion (§4b consent check).
 - **Records and unsubscribe:** `marketing_opt_in` = 1 and **`marketing_opt_in_at`** (when the box was left ticked and the step confirmed) are stored; every marketing mail has a **one-click unsubscribe** (and the `List-Unsubscribe` header) that sets `marketing_opt_in = 0`; a person who unticks it never gets one. Service mail never carries the marketing content.
 - **No code step at signup.** The first digest carries a "confirm your email" link (`email_confirmed_at`). An unconfirmed address still gets the digest (the address is the person's own to type; a wrong one costs us one bounce and turns email off).
-- **The email creates a trial account on the server,** in the same table as Pro accounts (`pro_accounts`, coordinated with job-pilotto-a6; migration 0082 (`site/migrations/0082_pro_trial.sql`, PR #1094) adds `plan` ('trial'|'pro', default 'pro'), `email_confirmed_at`, `marketing_opt_in`, `marketing_opt_in_at`, `trial_started_at`, `service_mail_off_at`). A trial account never gets Pro treatment (the Pro lane needs `plan = 'pro'` and `status = 'active'`). A later purchase finds the account by the same email hash and flips `plan` to `pro`: **one click**, no second sign-up. The install is linked in `pro_devices` (raw install id, max 3 devices).
+- **The email creates a trial account on the server,** in the same table as Pro accounts (`pro_accounts`, coordinated with jobadabra-a6; migration 0082 (`site/migrations/0082_pro_trial.sql`, PR #1094) adds `plan` ('trial'|'pro', default 'pro'), `email_confirmed_at`, `marketing_opt_in`, `marketing_opt_in_at`, `trial_started_at`, `service_mail_off_at`). A trial account never gets Pro treatment (the Pro lane needs `plan = 'pro'` and `status = 'active'`). A later purchase finds the account by the same email hash and flips `plan` to `pro`: **one click**, no second sign-up. The install is linked in `pro_devices` (raw install id, max 3 devices).
 - **Signup metric:** `/admin` counts **trial accounts** (confirmed / unconfirmed / marketing opt-in / paused / converted) instead of counting installs. Installs without an email stay a separate "anonymous" number.
 - **Data rule:** the address is stored once per person (hash for lookup, plain for sending), deleted with the account; hosted data deletion (§2) does not delete the account, "Delete my account" does.
 
@@ -204,7 +204,7 @@ Hosted Always on for trial users needs the **trial budget, not payments** (owner
 7. **Test on a twin/test install end to end;** owner flips `HOSTED_ALWAYS_ON=on` (after the cap decision in §3).
 8. **With Pro:** `pro_credit` compute debit, frequency choices, pricing/privacy/terms lines, resume on purchase.
 
-## Decided by the owner (16 Oct 2026, via job-pilotto-cc)
+## Decided by the owner (16 Oct 2026, via jobadabra-cc)
 0. **Default-on for trial users** (see §4b), email in onboarding, 14-day auto-pause, hosted before the Pro launch (16 Oct, later).
 1. **Frequency:** default **once a day**, choices up to **every 4 h** (the cap).
 2. **Compute debit:** **$0.008 a run** (2x the local $0.0039), **re-set to $0.011 after the container probe** (2x the measured ≈ $0.0055; see §3 Measured in a container). Trial: once a day, from the $2 budget.
@@ -212,13 +212,13 @@ Hosted Always on for trial users needs the **trial budget, not payments** (owner
 4. **Probe approved:** one container cost probe of about $0.01 on our Cloudflare account; stop if it heads past $0.10. Result: §3 "Measured".
 
 ## Progress
-- [x] Owner model added: own resources unlimited, ours debited; trial users can try it (16 Oct, via job-pilotto-cc) (proof: none: decisions relayed by cc, see §0, §4b, §4c)
+- [x] Owner model added: own resources unlimited, ours debited; trial users can try it (16 Oct, via jobadabra-cc) (proof: none: decisions relayed by cc, see §0, §4b, §4c)
 - [x] Spec read by the owner; questions 1-4 answered (proof: none: answers relayed by cc, see Decided above)
 - [x] Probe: container run measured, §3 estimate kept beside the measured numbers (proof: none: measured by the one-off CI job hosted-probe.yml, GitHub Actions run 38970122801, numbers in §3)
 - [x] PR 1 (site): tables, install-bound tokens, routes, flag (proof: site/test/hosted-schedule.test.js)
 - [x] PR 2 (engine + image): `--hosted` entry, Dockerfile, R2 round-trip (proof: tests/test_hosted_run.py)
 - [ ] PR 3 (site): cron tick, Queue, container start, trial-budget debit, global caps, 14-day auto-pause, guards, export and delete (proof: site/test/hosted-guards.test.js)
-- [ ] PR 0 (site, job-pilotto-a6, #1094): migration 0082 trial columns on `pro_accounts`, `createAccount(..., {plan})` (proof: site/test/pro-credit.test.js)
+- [ ] PR 0 (site, jobadabra-a6, #1094): migration 0082 trial columns on `pro_accounts`, `createAccount(..., {plan})` (proof: site/test/pro-credit.test.js)
 - [x] PR 3c (site): email sender, daily digest, one-click stop link, bounce handling, trial/lifecycle mail off by default (#1115), digest hold + daily/weekly cadence (#1116, #1117), branded frame + Email settings page (#1124) Sends nothing until `MAIL="on"`. (proof: site/test/mail-frame.test.js @52f2e8a)
 - [ ] PR 4 (app): onboarding switch on + disclosure + email field, inbox merge, Settings, sidebar, ⌘K, run card, shots (proof: desktop/test/hosted-search.test.js)
 - [x] Owner decides the Free AI monthly cap: stop $200, alert $100 (proof: none: decided by the owner via cc, 16 Oct; the wrangler.toml change is its own small site PR)

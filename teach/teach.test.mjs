@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {build, teach} from './teach.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'job-pilotto/extension')].find(item => item && fs.existsSync(path.join(item, 'recipe-schema.js')));
+const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'jobadabra/extension')].find(item => item && fs.existsSync(path.join(item, 'recipe-schema.js')));
 const {validateRecipe} = await import(pathToFileURL(path.join(dir, 'recipe-schema.js')).href);
 const params = {option: 'div.choice', onAttr: 'data-state', onValue: 'checked'};
 

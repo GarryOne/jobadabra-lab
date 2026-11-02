@@ -1,9 +1,9 @@
 ---
 name: notion-map
-description: Map of the Job Pilotto Notion workspace (page and database IDs, what lives where). Use at the start of a fresh session, or whenever you need to find or link a specific Notion page/database without searching from scratch. Structural reference only; no Notion page is read at session start (owner, 11 Oct 2026).
+description: Map of the Jobadabra Notion workspace (page and database IDs, what lives where). Use at the start of a fresh session, or whenever you need to find or link a specific Notion page/database without searching from scratch. Structural reference only; no Notion page is read at session start (owner, 11 Oct 2026).
 ---
 
-# Job Pilotto — Notion structure
+# Jobadabra — Notion structure
 
 IDs below are stable (Notion page/database IDs don't change on rename or move); titles can drift.
 If a fetch 404s or the title looks wrong, `notion-search` for the title and update this file.
@@ -15,7 +15,7 @@ The Session Handoff and the Run Log were retired on 11 Oct 2026 and moved under 
 ## Hierarchy
 
 ```
-🇨🇭 Job Pilotto — Project Hub (3e462be8fd86816ebef1c94a62a56c20)   (reorganized 29 Sep 2026: why / what / for whom / how / what happened)
+🇨🇭 Jobadabra — Project Hub (3e462be8fd86816ebef1c94a62a56c20)   (reorganized 29 Sep 2026: why / what / for whom / how / what happened)
 ├── 🧭 Strategy (3ea62be8fd868178a491d0dbe02b6a14)   [shared with the Job Pilotto Brain connection]
 │   ├── 📍 Product Compass (3ea62be8fd868115b9c5ef86331b72cb) (the owner's phase, north star, goal, bets)
 │   ├── Marketing Strategy — Free vs Premium (3e862be8fd868172a5c7f1056b745d6e)
@@ -28,10 +28,10 @@ The Session Handoff and the Run Log were retired on 11 Oct 2026 and moved under 
 │   ├── UI/UX Backlog — Design Ideas (3ea62be8fd8681c690b5f0e8bf1eabb4)
 │   ├── AI Roadmap — Stages 1 to 5 (3e562be8fd86819d882cd6e7b94bef9b)
 │   ├── Release stages — Alpha → Beta → RC → 1.0 (3e962be8fd86813c9a32fbed2aaff2fa)
-│   └── 🧠 How Job Pilotto Learns — the smartness, end to end (3ea62be8fd8681818a8ddbf84ba6c262)
+│   └── 🧠 How Jobadabra Learns — the smartness, end to end (3ea62be8fd8681818a8ddbf84ba6c262)
 ├── 🚀 Users & Launch (3e562be8fd8681378229ef71e8420542)   (was 4 · Productization)
 │   ├── First Customer Onboarding (3e862be8fd8681e78558d784c7cb9c81)
-│   ├── Job Pilotto [public template: every database and page, no data; published at https://adaptable-bit-846.notion.site/Job-Pilotto-3e862be8fd868143b431df70d505ed7c] (3e862be8fd868143b431df70d505ed7c)
+│   ├── Jobadabra [public template: every database and page, no data; published at https://adaptable-bit-846.notion.site/Jobadabra-3e862be8fd868143b431df70d505ed7c] (3e862be8fd868143b431df70d505ed7c)
 │   └── Setup Guide, User Guide
 ├── ⚙️ Engineering (3e562be8fd8681d89bd9e618ff7ea048)   (was 2 · System & Architecture)
 │   ├── Technical Reference — Implementation (3e562be8fd868124a28ee7c044dc83dc)
@@ -68,7 +68,7 @@ The Session Handoff and the Run Log were retired on 11 Oct 2026 and moved under 
 | How the pipeline works (modules, modes, AI stages, kit, feeds) | Technical Reference (`...dc83dc`) |
 | Why an owner decision was made, alternatives rejected | Decision Log database (`e4d099e6...`), read on demand |
 | Dated history of every change | `git log` (the Run Log is retired, archived) |
-| Competitors, their prices, where Job Pilotto differs | Market & Competitors (`...e085ae`) |
+| Competitors, their prices, where Jobadabra differs | Market & Competitors (`...e085ae`) |
 | Milestone status, what's Done vs In progress, key numbers | 📈 Progress (`...ae8f8c69`) + Rollout database |
 | The product's phase, goal and bets (what to work on) | 📍 Product Compass (`...86331b72cb`) in 🧭 Strategy |
 | Candidate's real facts the scorer/kit drafts against | Profile — CV and Preferences (`...9921b8c`) — editing it re-scores every open job |

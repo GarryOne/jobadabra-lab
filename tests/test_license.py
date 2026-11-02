@@ -68,6 +68,18 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class InitGuardTest(unittest.TestCase):
+    def test_init_refuses_while_the_old_keychain_name_still_holds_the_key(self):
+        """Lab #68 (Gitar): a Mac not yet copied to the new names must not get a second signing key."""
+        from unittest import mock
+        with mock.patch.object(lic, "keychain_get", return_value=None), mock.patch.object(lic, "old_signing_key_exists", return_value=True), \
+                mock.patch.object(lic, "keychain_set") as stored:
+            with self.assertRaises(SystemExit) as stopped:
+                lic.main(["init"])
+        self.assertIn("old Keychain name", str(stopped.exception))
+        stored.assert_not_called()
+
+
 class SyncTest(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()

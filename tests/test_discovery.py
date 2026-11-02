@@ -1,5 +1,5 @@
 """The private discovery (discovery/commoncrawl.py, discovery/priorities.py) and the canary tool, run against the public engine's code
-(JOB_PILOTTO_PUBLIC, default ~/jobadabra). Fake archive answers only: no network."""
+(JOBADABRA_PUBLIC, default ~/jobadabra). Fake archive answers only: no network."""
 import importlib.util
 import io
 import json
@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 OPS = Path(__file__).resolve().parents[1]
-ENGINE = Path(os.getenv('JOB_PILOTTO_PUBLIC') or Path.home() / 'job-pilotto')
+ENGINE = Path(os.getenv('JOBADABRA_PUBLIC') or Path.home() / 'jobadabra')
 
 
 def module(path, name):
@@ -38,7 +38,7 @@ class DiscoveryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         sys.path.insert(0, str(ENGINE))
-        os.environ['JOB_PILOTTO_FOLLOW_APP'] = '0'
+        os.environ['JOBADABRA_FOLLOW_APP'] = '0'
         cls.cc = module(OPS / 'discovery' / 'commoncrawl.py', 'commoncrawl')
         cls.prio = module(OPS / 'discovery' / 'priorities.py', 'priorities')
         from src import scout

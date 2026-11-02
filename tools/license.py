@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""License keys for Job Pilotto (Stage 1), signed by the owner with Ed25519.
+"""License keys for Jobadabra (Stage 1), signed by the owner with Ed25519.
 
   tools/license.py init                                    one time: make the signing key (Keychain only), print the public key
   tools/license.py mint --name "Ana" --kind friend [--until 2027-01-01]
@@ -10,7 +10,7 @@
   tools/license.py sync                                    Notion 🔑 Licenses: every key, status, and when its app was last seen
 
 Key format: JP1.<base64url payload>.<base64url signature>, payload {id, name, kind: founder|friend|pass, until?}.
-The private key lives ONLY in the macOS Keychain (job-pilotto.license.signing_key): never in git, Notion or logs.
+The private key lives ONLY in the macOS Keychain (jobadabra.license.signing_key): never in git, Notion or logs.
 data/licenses.json keeps what was minted (id, name, kind, until, date), never a key or the private key.
 """
 import argparse
@@ -28,7 +28,10 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-ACCOUNT, SERVICE = "job-pilotto", "job-pilotto.license.signing_key"
+ACCOUNT, SERVICE = "jobadabra", "jobadabra.license.signing_key"
+# Why (2 Nov 2026, Gitar on lab #68): the rename moves the signing key's Keychain name; a Mac that has not run tools/keychain-copy-to-jobadabra.sh in the public repo
+# still holds the key under the old name, and `init` would mint a second key that no license verifies against. Not a fallback: init only refuses.
+OLD_SIGNING_ITEM = ("job-pilotto", "job-pilotto.license.signing_key")
 KINDS = ("founder", "friend", "pass")
 DATA = Path(__file__).resolve().parent.parent / "data"
 LEDGER, REVOCATIONS = "licenses.json", "revocations.json"
@@ -45,6 +48,10 @@ def unb64(text: str) -> bytes:
 def keychain_get() -> str | None:
     done = subprocess.run(["security", "find-generic-password", "-a", ACCOUNT, "-s", SERVICE, "-w"], capture_output=True, text=True)
     return done.stdout.strip() if done.returncode == 0 else None
+
+
+def old_signing_key_exists() -> bool:
+    return subprocess.run(["security", "find-generic-password", "-a", OLD_SIGNING_ITEM[0], "-s", OLD_SIGNING_ITEM[1]], capture_output=True).returncode == 0
 
 
 def keychain_set(value: str) -> None:
@@ -71,7 +78,7 @@ def verify(text: str, public: str, prefix: str = "JP1") -> dict:
     """The payload of a genuinely signed key; ValueError otherwise."""
     parts = text.strip().split(".")
     if len(parts) != 3 or parts[0] != prefix:
-        raise ValueError("Not a Job Pilotto license key")
+        raise ValueError("Not a Jobadabra license key")
     try:
         Ed25519PublicKey.from_public_bytes(unb64(public)).verify(unb64(parts[2]), parts[1].encode())
         return json.loads(unb64(parts[1]))
@@ -98,9 +105,9 @@ def show(key: Ed25519PrivateKey, who: str) -> list[tuple[dict, str]]:
 
 
 # ---- Notion 🔑 Licenses (Project Hub → Users & Launch): one row per key, never the key itself ----
-# Written with the Job Pilotto Brain connection (Keychain job-pilotto.notion.brain_token); "Last seen" comes from the
-# apps' daily health lines (the website's /api/signals, key job-pilotto.site.stats_key), which carry only the id.
-SIGNALS = "https://www.jobpilotto.workers.dev/api/signals?days=30"
+# Written with the Job Pilotto Brain connection (Keychain jobadabra.notion.brain_token); "Last seen" comes from the
+# apps' daily health lines (the website's /api/signals, key jobadabra.site.stats_key), which carry only the id.
+SIGNALS = "https://www.jobadabra.top/api/signals?days=30"
 
 
 def keychain(service: str) -> str:
@@ -109,19 +116,19 @@ def keychain(service: str) -> str:
 
 def http(url: str, method: str = "GET", body: dict | None = None, headers: dict | None = None) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, method=method,
-                                 headers={"Content-Type": "application/json", "User-Agent": "job-pilotto-license", **(headers or {})})
+                                 headers={"Content-Type": "application/json", "User-Agent": "jobadabra-license", **(headers or {})})
     with urllib.request.urlopen(req, timeout=30) as response:
         return json.loads(response.read() or b"{}")
 
 
 def notion_api(path: str, method: str = "GET", body: dict | None = None) -> dict:
     return http(f"https://api.notion.com/v1/{path}", method, body,
-                {"Authorization": f"Bearer {keychain('job-pilotto.notion.brain_token')}", "Notion-Version": "2022-06-28"})
+                {"Authorization": f"Bearer {keychain('jobadabra.notion.brain_token')}", "Notion-Version": "2022-06-28"})
 
 
 def seen_by_id() -> dict:
     try:
-        return http(SIGNALS, headers={"Authorization": f"Bearer {keychain('job-pilotto.site.stats_key')}"}).get("licenses", {})
+        return http(SIGNALS, headers={"Authorization": f"Bearer {keychain('jobadabra.site.stats_key')}"}).get("licenses", {})
     except (urllib.error.URLError, subprocess.CalledProcessError, OSError) as error:
         print(f"(Last seen not updated: {error})", file=sys.stderr)
         return {}
@@ -167,7 +174,7 @@ def try_sync() -> None:
 
 
 def install_line(key: str) -> str:
-    return f"curl -fsSL https://www.jobpilotto.workers.dev/install | bash -s {key}"
+    return f"curl -fsSL https://www.jobadabra.top/install | bash -s {key}"
 
 
 def mint(key: Ed25519PrivateKey, name: str, kind: str, until: str | None = None, today: datetime.date | None = None) -> str:
@@ -217,6 +224,8 @@ def main(argv=None) -> None:
     if args.command == "init":
         if keychain_get():
             sys.exit(f"A signing key already exists ({SERVICE}). Not replacing it: every key minted so far would stop verifying.")
+        if old_signing_key_exists():
+            sys.exit(f"The signing key is still under its old Keychain name. Copy it first (tools/keychain-copy-to-jobadabra.sh --go in the jobadabra repo); init would make a second key and every key minted so far would stop verifying.")
         seed = Ed25519PrivateKey.generate()
         keychain_set(b64(seed.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())))
         print(f"Signing key stored in the Keychain as {SERVICE}.\nPublic key (goes into desktop/lib/license.js): {public_b64(seed)}")

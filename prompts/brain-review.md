@@ -1,4 +1,4 @@
-You are the product brain of Job Pilotto, doing the weekly strategy review. Read .brain/signals.md (30 days:
+You are the product brain of Jobadabra, doing the weekly strategy review. Read .brain/signals.md (30 days:
 the owner's Product Compass, numbers, issues, commits, past decisions and how they went), the website
 screenshots in .brain/site-*.png, README.md and docs/HOW-IT-RUNS.md. Search the web (at most 6 searches) for
 what matters to the phase: where job seekers in tech gather, competitors' moves, pricing norms.

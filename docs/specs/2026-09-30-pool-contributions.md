@@ -34,7 +34,7 @@ Jobs, applications, CV, profile, answers, salaries, Notion content, keys, e-mail
   from public facts plus two coarse tags, kept 90 days; the app keeps only the on/off switch (`settings.shareEmployers`,
   default **on for new installs**, pinned **off** for installs set up before it existed) and the date of the last send (a cache).
 - Off = nothing leaves the Mac or the user's GitHub runs. The switch and "See what would be sent" are in Settings; the privacy page says it plainly.
-- Always-on runs read the same choice from repository variables the app sets (`JOB_PILOTTO_SHARE_EMPLOYERS`, `JOB_PILOTTO_INSTALL_ID`).
+- Always-on runs read the same choice from repository variables the app sets (`JOBADABRA_SHARE_EMPLOYERS`, `JOBADABRA_INSTALL_ID`).
 
 ## Words
 Settings card: "Help the pool grow". Privacy page: one plain paragraph. Landing: the pool line says nothing goes up unless the user opts in.

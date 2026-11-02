@@ -10,7 +10,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {OPERATOR_OF} from '../proposer/proposer-lib.mjs';
 
-const SITE = 'https://www.jobpilotto.workers.dev';
+const SITE = 'https://www.jobadabra.top';
 
 // -> {ok, recipe} or {ok: false, error}. `known` are the versions already on the site for this fingerprint.
 export function build({fingerprint, kind, params, known = [], validateRecipe}) {

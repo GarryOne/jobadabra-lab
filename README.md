@@ -1,4 +1,4 @@
-# Job Pilotto · internal (private)
+# Jobadabra · internal (private)
 
 What makes the public product [GarryOne/jobadabra](https://github.com/GarryOne/jobadabra) smart and how it steers
 itself. Not published (Notion 🧭 Strategy → 💰 IP & Monetization, 🪜 Stages).
@@ -18,7 +18,7 @@ itself. Not published (Notion 🧭 Strategy → 💰 IP & Monetization, 🪜 Sta
 
 ## License keys (Stage 1)
 `tools/license.py` mints owner-signed keys (`init` once, then `mint --name "Ana" --kind friend [--until 2027-01-01]`, `list`, `revoke <id>`, `verify <key>`).
-The private key is only in the Keychain (`job-pilotto.license.signing_key`); `data/licenses.json` lists who got one (no keys).
+The private key is only in the Keychain (`jobadabra.license.signing_key`); `data/licenses.json` lists who got one (no keys).
 Tests: `python3 -m unittest discover -s tests`.
 
 ## How a fix reaches users (no pull requests)

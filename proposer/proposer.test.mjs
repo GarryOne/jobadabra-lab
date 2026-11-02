@@ -10,7 +10,7 @@ import {run} from './proposer.mjs';
 
 // The shared validator lives in the public repo: a checkout next to this one in CI (public/), the local clone otherwise.
 const here = path.dirname(new URL(import.meta.url).pathname);
-const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'job-pilotto/extension')].find(item => item && fs.existsSync(path.join(item, 'recipe-schema.js')));
+const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'jobadabra/extension')].find(item => item && fs.existsSync(path.join(item, 'recipe-schema.js')));
 assert.ok(dir, 'the public extension/recipe-schema.js is needed (set EXTENSION_DIR)');
 const {validateRecipe} = await import(pathToFileURL(path.join(dir, 'recipe-schema.js')).href);
 

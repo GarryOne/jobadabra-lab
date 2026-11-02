@@ -1,4 +1,4 @@
-"""tools/public-tree.sh builds the lab's working tree: public job-pilotto at a ref with this repo's files laid over it, its own rules left out."""
+"""tools/public-tree.sh builds the lab's working tree: public jobadabra at a ref with this repo's files laid over it, its own rules left out."""
 import os
 import pathlib
 import subprocess

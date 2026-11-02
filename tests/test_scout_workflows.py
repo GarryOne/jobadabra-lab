@@ -1,13 +1,13 @@
 """The central scout's and the product brain's workflows, which moved here from the public repo (1 Nov 2026, rs 6b/6; owner: "jobadabra should have no web, no worker").
 The wiring tests that read their text moved with them, so the public repo has no server workflow to read. The engine side of each assertion
-(scout_core's budgets, the relay, the brain's Codex step) stays tested in the public repo; JOB_PILOTTO_PUBLIC points at its checkout."""
+(scout_core's budgets, the relay, the brain's Codex step) stays tested in the public repo; JOBADABRA_PUBLIC points at its checkout."""
 import os
 import re
 import unittest
 from pathlib import Path
 
 OPS = Path(__file__).resolve().parents[1]
-ENGINE = Path(os.getenv('JOB_PILOTTO_PUBLIC') or Path.home() / 'jobadabra')
+ENGINE = Path(os.getenv('JOBADABRA_PUBLIC') or Path.home() / 'jobadabra')
 WORKFLOWS = OPS / '.github' / 'workflows'
 ACTIVE = False   # Why (1 Nov 2026, rs 6b/6): flipped to True by the switch PR (6b-4), in the same commit that deletes the public copies; two schedulers would publish the index twice.
 
@@ -48,7 +48,7 @@ class CentralScout(unittest.TestCase):
     def test_its_ai_runs_behind_the_broker_relay_on_the_40_call_cap(self):
         """Owner, 26 Oct 2026 "keep claude for the scout"; 31 Oct 2026 "We should use fully the Codex": no Anthropic key, no Free AI, no address off this machine."""
         self.assertNotRegex(self.code, r'(?i)anthropic', 'the scout holds no Anthropic key and no base URL')
-        self.assertNotRegex(self.code, r'(?i)free_ai|JOB_PILOTTO_AI_ENGINE', 'the scout never switches to Free AI or another engine')
+        self.assertNotRegex(self.code, r'(?i)free_ai|JOBADABRA_AI_ENGINE', 'the scout never switches to Free AI or another engine')
         self.assertIn('id-token: write', self.code)
         self.assertIn("CENTRAL_AI_CAP: '40'", self.code)
         self.assertIn('broker-relay-run.mjs --job central-scout --cap "$CENTRAL_AI_CAP" -- python -m src scout', self.code)
@@ -62,7 +62,7 @@ class CentralScout(unittest.TestCase):
         self.assertIn('SCOUT_SERPAPI_KEY: ${{ secrets.CENTRAL_SCOUT_SERPAPI_KEY }}', self.text)
         self.assertNotIn('SERPAPI_API_KEY:', self.text, "that name turns on the role searches' SerpApi lane, outside the month cap")
 
-    @unittest.skipUnless((ENGINE / 'src' / 'scout_core.py').exists(), 'the public engine is not checked out next to this repo (lab-ci sets JOB_PILOTTO_PUBLIC, so it runs there)')
+    @unittest.skipUnless((ENGINE / 'src' / 'scout_core.py').exists(), 'the public engine is not checked out next to this repo (lab-ci sets JOBADABRA_PUBLIC, so it runs there)')
     def test_the_job_limit_covers_setup_both_budgets_and_the_publish_reserve(self):
         limit = int(re.search(r'timeout-minutes: (\d+)', self.text).group(1))
         setup, reserve = 6, 3   # minutes: checkout, installs, Common Crawl (3 min cap) before the scout; upload and cost report after
