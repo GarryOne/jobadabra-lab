@@ -59,7 +59,7 @@ jobs:
           JP_REPLAY_WINDOW: ${{ inputs.window || 'quick' }}
           JP_REPLAY_SHARD: ${{ matrix.shard }}/${{ env.JP_REPLAY_SHARD_COUNT }}
           JP_REPLAY_RESULTS: replay-results-${{ matrix.shard }}.json
-        run: node --test --test-concurrency=1 test/recorded-pages.test.mjs
+        run: node --test --test-concurrency=1 test/record/recorded-pages.test.mjs
       - name: Keep this shard's results
         if: always()
         uses: actions/upload-artifact@v6
