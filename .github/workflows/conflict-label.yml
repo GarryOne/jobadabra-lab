@@ -1,4 +1,4 @@
-# Why (2 Nov 2026, owner: "let's implement the GH labels on benchmarks repo as well"): the script is NOT copied here; this workflow checks out tools/conflict-label.mjs and tools/gitar-label.mjs from the public
+# Why (2 Nov 2026, owner: "basically on all the repos in the org... the same workflow"): the script is NOT copied here; this workflow checks out tools/conflict-label.mjs and tools/gitar-label.mjs from the public
 # jobadabra/jobadabra main (run only as a label writer, never the PR's code), so a fix to the parser lands in every repo at once. Same triggers, permissions and rules as there.
 # Puts an orange "Merge conflict" label on each open PR that GitHub says conflicts with its base, and takes it off once it merges cleanly (owner, 30 Oct 2026).
 # Runs on a push to main (any open PR may now conflict) and on a PR push (it may be fixed); checks out main's copy of the script and NEVER runs a PR's code;
@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  label:
+  conflict:   # not `label`: it must never read as the Gitar label check (web, 1 Nov 2026)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -34,6 +34,7 @@ jobs:
           sparse-checkout: |
             tools/conflict-label.mjs
             tools/gitar-label.mjs
+          sparse-checkout-cone-mode: false
       - name: Label the open PRs that conflict
         env:
           GH_TOKEN: ${{ github.token }}
