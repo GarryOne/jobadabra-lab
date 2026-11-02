@@ -5,7 +5,7 @@ itself. Not published (Notion 🧭 Strategy → 💰 IP & Monetization, 🪜 Sta
 
 | Here | What |
 |---|---|
-| `prompts/*.md` | the product brain (brief, explore, Sunday review) and weekly self-review prompts. **Edit here, then run `tools/sync-prompts.sh`**: they become encrypted secrets of the public repo, where the workflows run |
+| `prompts/*.md` | the product brain (brief, explore, Sunday review) and weekly self-review prompts. **Edit here, then run `tools/sync-prompts.sh`**: they become encrypted secrets of this (lab) repo, where the brain workflow runs; the script refuses any other repo |
 | `triage/` + `.github/workflows/triage.yml` | the **daily triage**: pulls recurring problems from the site's queue (several installs, or very often) and files them as issues here, one per problem. Needs `LAB_KEY` |
 | `proposer/` + `.github/workflows/proposer.yml` | the **recipe proposer**: daily, for failing controls without a recipe it asks a small model (Haiku, capped at 20 controls and $0.50 a run), validates the answer with the extension's own `recipe-schema.js` and files it as a **candidate**; the canary rolls it out (the form lab that used to try it first was retired 9 Oct 2026: it tested public forms real fills never meet). Needs `LAB_KEY` and `ANTHROPIC_API_KEY` |
 | `teach/teach.mjs` | **Claude as teacher**: a Claude session that operated a control by hand files how as a candidate recipe (same validator, same path as the proposer, source `claude`). Run: `LAB_KEY=… node teach/teach.mjs --extension ../public/extension --fingerprint <fp> --kind toggle-group --params '{…}'` |
