@@ -1,4 +1,4 @@
-# Why (2 Nov 2026, owner: "let's implement the GH labels on benchmarks repo as well"): the script is NOT copied here; this workflow checks out tools/gitar-label.mjs from the public
+# Why (2 Nov 2026, owner: "basically on all the repos in the org... the same workflow"): the script is NOT copied here; this workflow checks out tools/gitar-label.mjs from the public
 # jobadabra/jobadabra main (run only as a label writer, never the PR's code), so a fix to the parser lands in every repo at once. Same triggers, permissions and rules as there.
 # Puts one coloured "Gitar: …" label on a PR from Gitar's verdict comment, so the PR list shows changes requested / approved with suggestions / approved (owner, 28 Oct 2026).
 # Runs on a push (pull_request_target: the head moved, "reviewing" until Gitar judges it), on Gitar submitting or dismissing a review (pull_request_review), and on
@@ -41,7 +41,9 @@ jobs:
         with:
           repository: jobadabra/jobadabra   # the script lives there (public), not in this repo
           ref: main
-          sparse-checkout: tools/gitar-label.mjs
+          sparse-checkout: |
+            tools/gitar-label.mjs
+          sparse-checkout-cone-mode: false
       - name: Set the label from Gitar's verdict
         env:
           GH_TOKEN: ${{ github.token }}
