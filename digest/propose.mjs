@@ -80,11 +80,11 @@ function file(p, digest, repo, dry) {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2), option = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
-  const site = option('site', 'https://www.jobpilotto.workers.dev'), dry = args.includes('--dry'), budget = Number(option('budget', '0.05'));
+  const site = option('site', 'https://www.jobadabra.top'), dry = args.includes('--dry'), budget = Number(option('budget', '0.05'));
   const repo = process.env.GITHUB_REPOSITORY || 'GarryOne/jobadabra-lab';
   const result = {usd: 0, calls: 0, proposals: [], filed: []};
   const save = () => option('out') && fs.writeFileSync(option('out'), JSON.stringify(result, null, 1));
-  const response = await fetch(`${site}/admin/form-filling/digest.json`, {headers: {Authorization: `Bearer ${process.env.LAB_KEY}`, 'User-Agent': 'job-pilotto-internal-form-learning'}});
+  const response = await fetch(`${site}/admin/form-filling/digest.json`, {headers: {Authorization: `Bearer ${process.env.LAB_KEY}`, 'User-Agent': 'jobadabra-internal-form-learning'}});
   if (!response.ok) { console.log(`digest: HTTP ${response.status}`); save(); process.exit(1); }
   const digest = await response.json();
   console.log(`digest ${digest.period.from} → ${digest.period.to}: ${digest.thisWeek.forms} forms, ${digest.weaknesses.length} weaknesses`);

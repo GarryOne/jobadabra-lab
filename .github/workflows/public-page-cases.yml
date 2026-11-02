@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       public_ref:
-        description: 'public job-pilotto ref: main, a branch or a commit sha'
+        description: 'public jobadabra ref: main, a branch or a commit sha'
         default: 'main'
       window:
         description: 'quick = what a pull request runs; full = the whole window'

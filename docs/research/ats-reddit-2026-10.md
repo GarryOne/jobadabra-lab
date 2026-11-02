@@ -18,7 +18,7 @@ r/ExperiencedDevs and r/resumes, exported 3 Oct 2026. Counts are threads, not re
 subset; AI sourcing helps vs "all garbage, false positives". **Marketing to discount:** a resume-scanner developer, a resume-service founder,
 a CV-scoring tool promoter, recruiting-software vendors in the AI-workflow thread.
 
-## What Job Pilotto does with it
+## What Jobadabra does with it
 - **Knockout questions come first.** The form panel marks them ⛔ in "Left for you" and says why (`extension/review.js`, `KNOCKOUT`).
 - **The CV check is a readiness check, not an ATS score** (`desktop/lib/cv-check.js`). Parser penalties for photos, banners and columns are small
   and worded as unconfirmed; the weight is on text that exists, contact details as text, standard headings, dates, length.

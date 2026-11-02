@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'apply');
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 && args[i + 1] ? args[i + 1] : fallback; };
-const site = option('site', 'https://www.jobpilotto.workers.dev').replace(/\/$/, '');
+const site = option('site', 'https://www.jobadabra.top').replace(/\/$/, '');
 const dry = args.includes('--dry');
 const key = process.env.LAB_KEY;
 if (!key && !dry) { console.error('LAB_KEY is needed.'); process.exit(2); }

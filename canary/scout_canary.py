@@ -4,7 +4,7 @@
 Real career sites change their pages; the public repo's unit tests and fixture end-to-end cannot see that. This reads the fixed list the
 way the scout does (rules only: no AI, no browser) and exits 1 when fewer than min_found still give a feed, listing which ones stopped.
 Private (moved from the public repo on 3 Oct 2026): the list itself is a curated set of good Swiss sources.
-Run from a checkout of the public engine:   python ../ops/canary/scout_canary.py      (or with JOB_PILOTTO_PUBLIC=<path to it>)
+Run from a checkout of the public engine:   python ../ops/canary/scout_canary.py      (or with JOBADABRA_PUBLIC=<path to it>)
 """
 import json
 import os
@@ -13,10 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 OPS = Path(__file__).resolve().parents[1]                       # this private repo (config/scout_canary.json)
-ENGINE = Path(os.getenv('JOB_PILOTTO_PUBLIC') or Path.cwd())     # the public engine (src/)
+ENGINE = Path(os.getenv('JOBADABRA_PUBLIC') or Path.cwd())     # the public engine (src/)
 sys.path.insert(0, str(ENGINE))
-os.environ.setdefault('JOB_PILOTTO_FOLLOW_APP', '0')
-os.environ.setdefault('JOB_PILOTTO_RENDER', '0')
+os.environ.setdefault('JOBADABRA_FOLLOW_APP', '0')
+os.environ.setdefault('JOBADABRA_RENDER', '0')
 
 from src import scout  # noqa: E402
 from src.sources import careers  # noqa: E402

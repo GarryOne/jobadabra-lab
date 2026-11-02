@@ -2,7 +2,7 @@
 // The owner's decision on an alias that waits as a candidate (a sensitive field, or too few reports): start its canary, or disable it.
 //   LAB_KEY=… node aliases/approve.mjs --phrase "ort der herkunft" --status canary [--rollout 5] [--approve]   (sensitive fields need --approve)
 //   LAB_KEY=… node aliases/approve.mjs --list                                                                    (the candidates waiting)
-const SITE = 'https://www.jobpilotto.workers.dev';
+const SITE = 'https://www.jobadabra.top';
 
 export async function decide({site = SITE, ownerKey, phrase, status, rollout = 5, approved = false, fetcher = fetch}) {
   const owner = {Authorization: `Bearer ${ownerKey}`, 'content-type': 'application/json'};

@@ -4,7 +4,7 @@
 fills each **one-page form** with the real extension and stops before Submit. In the morning one page lists them: **live view** (click and type in the server's
 browser) or **Open in my browser** (the 155 ms hand-off). **He presses Submit, never the server.** No accounts, no passwords on the server, no pricing.
 
-Owner (17 Oct 2026, via job-pilotto-cc): "Phase 1, just for you. One-page forms filled at night on Cloudflare. In the morning: a web page with the live view, or
+Owner (17 Oct 2026, via jobadabra-cc): "Phase 1, just for you. One-page forms filled at night on Cloudflare. In the morning: a web page with the live view, or
 'Open in my browser' with the 155 ms hand-off; you press Submit. No accounts, no pricing yet. Measure how many arrive complete before opening it to others."
 Sketch with the proof numbers: https://claude.ai/artifact/XRdcdJCBhE3zq4nXLeQ934
 
@@ -66,7 +66,7 @@ Morning: Worker page /ready  (owner token)  ->  per job:  [Live view]  (WebSocke
 Browser memory for 3 held tabs ≈ 1.3 GB (standard-1 has 4 GiB). 0 submits touched, 0 form posts. Partial = questions the kit does not cover (needs AI; phase 1 has none).
 
 ## Progress
-- [x] Sketch B and the proof approved; phase 1 chosen by the owner (17 Oct 2026, via job-pilotto-cc) (proof: none: decisions relayed by cc, see top)
+- [x] Sketch B and the proof approved; phase 1 chosen by the owner (17 Oct 2026, via jobadabra-cc) (proof: none: decisions relayed by cc, see top)
 - [x] Proof on Cloudflare: open 155 ms, human check + Submit through the stream, hand-off measured (proof: none: one-off CI run 39047884877, numbers in the sketch; tools/server-proof/)
 - [x] Repeat the stream Submit test that recorded no click in run 6: accepted again in run 8, 2 of 3 runs (proof: none: one-off CI runs 39047884877 and 39048751160, tools/server-proof/)
 - [x] PR 1 (site): tables, owner-only routes, encrypted batch, deletion (24 h, Done, Delete everything), cost row + cap (#1224) (proof: site/test/ready-to-send.test.js @c605c1c)

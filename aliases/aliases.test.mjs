@@ -10,7 +10,7 @@ import {decide as approve} from './approve.mjs';
 import {run} from './proposer.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'job-pilotto/extension')].find(item => item && fs.existsSync(path.join(item, 'alias-schema.js')));
+const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'jobadabra/extension')].find(item => item && fs.existsSync(path.join(item, 'alias-schema.js')));
 assert.ok(dir, 'the public extension/alias-schema.js is needed (set EXTENSION_DIR)');
 const schema = await import(pathToFileURL(path.join(dir, 'alias-schema.js')).href);
 const SENSITIVE = schema.SENSITIVE;

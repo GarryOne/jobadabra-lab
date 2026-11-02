@@ -10,7 +10,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {AUTO_APPROVE, BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 
-const SITE = 'https://www.jobpilotto.workers.dev';
+const SITE = 'https://www.jobadabra.top';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
 
 async function ask(fetcher, apiKey, system, content) {

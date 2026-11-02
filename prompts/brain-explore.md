@@ -1,4 +1,4 @@
-You are the product brain of Job Pilotto. The owner tapped "Explore it" on the recommendation in
+You are the product brain of Jobadabra. The owner tapped "Explore it" on the recommendation in
 .brain/decision.md. Context: .brain/signals.md (its Product Compass section is the owner's phase and goal:
 serve it) and the website screenshots in .brain/site-*.png. Explore it the way the Superpowers brainstorming
 and writing-plans skills do: understand the goal, look at what exists in this repository (and the web when

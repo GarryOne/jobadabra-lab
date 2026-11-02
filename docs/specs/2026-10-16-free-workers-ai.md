@@ -52,7 +52,7 @@ Same invented cases for every model. Open models: Cloudflare, Paid plan. Claude:
 - **Claude harness:** about 5% of calls ended "claude exited 1" in this setup (counted as wrong above); the tool now allows 3 turns, unverified.
 - **Cost:** Cloudflare about $0.10 in total; Claude $0 (subscription). An uncapped run on the production account once used the whole day's free allowance for every user, so the tool needs `--allow-production --max-calls` there.
 
-## Owner answers (16 Oct, via job-pilotto-cc)
+## Owner answers (16 Oct, via jobadabra-cc)
 - Retire `ANTHROPIC_TRIAL_KEY`: **yes** (the route no longer uses it; delete the Worker secret after PR 1 is deployed).
 - Limits as proposed: **yes**.
 ## Found while building
@@ -64,10 +64,10 @@ Same invented cases for every model. Open models: Cloudflare, Paid plan. Claude:
 - **Seniority from the title** (`src/ai/seniority.py`, #1052) settles the level where a title word decides; Free's Staff/Principal/Lead misses came from the model, not from the pre-score filters.
 
 ## Progress
-- [x] Spec read by the owner (via job-pilotto-cc) (proof: none: owner answered "Yes" and "retire" through job-pilotto-cc on 16 Oct)
+- [x] Spec read by the owner (via jobadabra-cc) (proof: none: owner answered "Yes" and "retire" through jobadabra-cc on 16 Oct)
 - [x] Measurement tool `tools/free-ai-eval.mjs` + `tools/free-ai-cases.py` (proof: desktop/test/free-ai-eval.test.js)
 - [x] The quality table in this spec (fictional data only) (proof: tools/free-ai-kit-cases.py)
 - [x] PR 1 (site): `free-ai.js` route, install-token auth, limits, kill switch, alert, tests (proof: site/test/free-ai.test.js); ai-cost already groups by model, Workers AI prices in `free-ai-models.js`
 - [x] PR 2 (app): credit → Free everywhere in §4 + migration + grep guard (proof: desktop/test/ai-free.test.js @0d3b2d6)
 - [x] PR 3 (UI): picker with logos, ⌘K, before/after shots (proof: desktop/test/engine-free-card.test.js @aa18d2a)
-- [x] Owner decisions: trial key fate, Workers Paid yes, limit numbers (proof: none: owner answered via job-pilotto-cc on 16 Oct: retire, limits yes, Workers Paid $5/month)
+- [x] Owner decisions: trial key fate, Workers Paid yes, limit numbers (proof: none: owner answered via jobadabra-cc on 16 Oct: retire, limits yes, Workers Paid $5/month)
