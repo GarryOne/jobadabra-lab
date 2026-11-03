@@ -83,7 +83,10 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const digest = await response.json();
   console.log(`digest ${digest.period.from} → ${digest.period.to}: ${digest.thisWeek.forms} forms, ${digest.weaknesses.length} weaknesses`);
   if (!digest.weaknesses.length) { console.log('Nothing ranked: no model call.'); save(); process.exit(0); }
-  const {text, usage} = await ask(digest);
+  let answer;
+  // Why (3 Nov 2026, review of the broker move): a broker "no" (cap, login, down) skips this week's proposals and the next run asks again; it never fails the job (the workflow header promises it).
+  try { answer = await ask(digest); } catch (error) { console.log(`::warning title=AI skipped (form-learning)::${error.message}`); save(); process.exit(0); }
+  const {text, usage} = answer;
   result.usd = costUsd(usage); result.calls = 1;
   if (result.usd > budget) console.log(`::warning::one call cost $${result.usd.toFixed(4)}, above the $${budget} budget`);
   result.proposals = proposals(text, digest);

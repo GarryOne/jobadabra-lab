@@ -2,9 +2,10 @@ name: Form learning
 # Weekly: read the form-filling learning digest (the site's /admin/form-filling/digest.json: efficiency per day and release, weaknesses
 # ranked by impact with evidence) and ask a small model for the 3 improvements that would remove the most lost questions. Each is filed
 # here as an issue (label form-learning) citing the digest's own weakness ids; one still open for the same weaknesses is updated instead.
-# One model call, Haiku, capped by --budget; its cost goes to /admin/ai-cost. A person decides; nothing is changed automatically.
-# Secrets: LAB_KEY (the site's scripts' key), AI_COST_PUBLISH_KEY.
-# No API key (owner, 3 Nov 2026: "We should not use API Keys at all anymore. Everything should be around the ai-broker"): the script runs behind the public repo's AI broker relay (public/desktop/e2e/broker-relay-run.mjs) on this run's OIDC token, on the Codex plan, scheduled lane behind the 70% reserve; a broker "no" skips the asks with an "AI skipped/failed" annotation and the next run asks again.
+# One model call, capped by --budget and the relay's call cap. A person decides; nothing is changed automatically.
+# Secrets: LAB_KEY (the site's scripts' key).
+# No API key (owner, 3 Nov 2026: "We should not use API Keys at all anymore. Everything should be around the ai-broker"): the script runs behind the public repo's AI broker relay (public/desktop/e2e/broker-relay-run.mjs) on this run's OIDC token, on the Codex plan (the scheduled lane, up to 100% of the Codex week since 31 Oct 2026); a broker "no" skips the asks with an "AI skipped/failed" annotation and the next run asks again.
+# No cost report to /ai-cost (3 Nov 2026): the figures were Haiku list prices of tokens the plan pays for, and /ai-cost would have read them as Anthropic dollars.
 # Broker calls a week: one (cap 3).
 on:
   schedule:
@@ -45,11 +46,6 @@ jobs:
         if: always()
         run: |
           { echo '### Form learning'; echo; echo '```'; tail -n 30 form-learning.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - name: Report the AI cost to /ai-cost
-        if: always()
-        env:
-          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
-        run: node public/desktop/e2e/ai-cost-report.mjs --job form-learning --file form-learning.json
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: form-learning, path: form-learning.json, retention-days: 30, if-no-files-found: ignore}
