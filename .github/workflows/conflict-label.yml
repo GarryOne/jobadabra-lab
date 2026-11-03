@@ -31,9 +31,11 @@ jobs:
         with:
           repository: jobadabra/jobadabra   # the script lives there (public), not in this repo
           ref: main
+          # Why (3 Nov 2026, jobadabra #3091): the scripts run gh through tools/gh_retry.py (one retry on a GitHub 5xx), so it is fetched too; missing it was a red "conflict" check on every lab PR.
           sparse-checkout: |
             tools/conflict-label.mjs
             tools/gitar-label.mjs
+            tools/gh_retry.py
           sparse-checkout-cone-mode: false
       - name: Label the open PRs that conflict
         env:
