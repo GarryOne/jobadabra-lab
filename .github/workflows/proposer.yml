@@ -4,7 +4,7 @@ name: Recipe proposer
 # pages the next morning and the canary rolls out the ones that work. Capped at --max controls and --budget dollars per run.
 # Lives in this private repo because the method and its prompt are part of the product's intelligence.
 # Secrets: LAB_KEY (the site's STATS_KEY).
-# No API key (owner, 3 Nov 2026: "We should not use API Keys at all anymore. Everything should be around the ai-broker"): the script runs behind the public repo's AI broker relay (public/desktop/e2e/broker-relay-run.mjs) on this run's OIDC token, on the Codex plan (the scheduled lane, up to 100% of the Codex week since 31 Oct 2026); a broker "no" skips the asks with an "AI skipped/failed" annotation and the next run asks again.
+# No API key (owner, 3 Nov 2026: "We should not use API Keys at all anymore. Everything should be around the ai-broker"): the script runs behind the public repo's AI broker relay (public/desktop/e2e/broker-relay-run.mjs) on this run's OIDC token, on the Codex plan (the scheduled lane: it stops at 70% of the Codex week, web #348); a broker "no" skips the asks with an "AI skipped/failed" annotation and the next run asks again.
 # No cost report to /ai-cost (3 Nov 2026): the figures were Haiku list prices of tokens the plan pays for, and /ai-cost would have read them as Anthropic dollars.
 # Broker calls a day: one per control, at most --max (20, cap 25), so at most 25 a day.
 on:
