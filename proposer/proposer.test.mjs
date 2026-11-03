@@ -7,6 +7,7 @@ import {test} from 'node:test';
 import {pathToFileURL} from 'node:url';
 import {MODEL, SYSTEM, buildMessage, costUsd, decide, parseAnswer} from './proposer-lib.mjs';
 import {run} from './proposer.mjs';
+process.env.JOBADABRA_AI_BASE_URL = 'http://relay.test';   // the AI broker relay's address (lib/messages.mjs); the fake network answers it, no key exists
 
 // The shared validator lives in the public repo: a checkout next to this one in CI (public/), the local clone otherwise.
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -75,7 +76,7 @@ function network(replies, targets) {
 
 test('a run files valid candidates, skips the rest, and reports what it spent', async () => {
   const {fetcher, calls} = network([JSON.stringify(good), '{"skip": true, "reason": "unclear"}'], [target(), target({fingerprint: 'other002'})]);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher});
+  const summary = await run({ownerKey: 'k', validateRecipe, fetcher});
   assert.deepEqual([summary.considered, summary.submitted, summary.skipped], [2, 1, 1]);
   assert.equal(calls.put.length, 1);
   assert.deepEqual([calls.put[0].status, calls.put[0].source, calls.put[0].recipe.fingerprint], ['candidate', 'proposer', 'worst001']);
@@ -85,14 +86,14 @@ test('a run files valid candidates, skips the rest, and reports what it spent', 
 test('a dry run files nothing; the budget stops a run; a model or network error skips instead of crashing', async () => {
   const many = Array.from({length: 5}, (_, i) => target({fingerprint: `many000${i}`}));
   const dry = network([JSON.stringify(good)], many);
-  assert.equal((await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: dry.fetcher, dry: true})).submitted, 5);
+  assert.equal((await run({ownerKey: 'k', validateRecipe, fetcher: dry.fetcher, dry: true})).submitted, 5);
   assert.equal(dry.calls.put.length, 0);
   const capped = network([JSON.stringify(good)], many);
-  const stopped = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: capped.fetcher, budget: 0.0003});
+  const stopped = await run({ownerKey: 'k', validateRecipe, fetcher: capped.fetcher, budget: 0.0003});
   assert.ok(stopped.considered < 5, 'stopped early');
   const broken = async url => (url.includes('/targets') ? {ok: true, json: async () => ({targets: [target()]})} : {ok: false, status: 400});
-  const failed = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher: broken});
-  assert.match(failed.results[0].why, /error: Anthropic 400/);
+  const failed = await run({ownerKey: 'k', validateRecipe, fetcher: broken});
+  assert.match(failed.results[0].why, /error: AI broker 400/);
 });
 
 test('an upload slot that failed with no file input is proposed a trigger, validated by the shared schema', () => {
@@ -108,6 +109,6 @@ test('an upload slot that failed with no file input is proposed a trigger, valid
 
 test('a kind no operator handles (an unread question, a switch) is skipped without a model call', async () => {
   const {fetcher, calls} = network([JSON.stringify(good)], [target({kind: 'question', fingerprint: 'unread01'}), target({kind: 'switch', fingerprint: 'switch01'})]);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', validateRecipe, fetcher});
+  const summary = await run({ownerKey: 'k', validateRecipe, fetcher});
   assert.deepEqual([summary.considered, summary.skipped, summary.spent, calls.model], [2, 2, 0, 0]);
 });

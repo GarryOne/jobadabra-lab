@@ -4,10 +4,11 @@
 // digest's own weakness ids (anything else is dropped), say the area of the fix and how to prove it; it is filed as an issue
 // here (label form-learning), and a proposal already open for the same weaknesses is updated instead of repeated.
 // One call, capped at --budget dollars. The digest holds counts and the forms' public wording only (no user data).
-//   node digest/propose.mjs [--site URL] [--budget 0.05] [--out result.json] [--dry]      env: LAB_KEY, ANTHROPIC_API_KEY, GH_TOKEN
+//   node digest/propose.mjs [--site URL] [--budget 0.05] [--out result.json] [--dry]      env: LAB_KEY, GH_TOKEN, JOBADABRA_AI_BASE_URL (the AI broker relay, no API key since 3 Nov 2026)
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {askMessages, relayUrl} from '../lib/messages.mjs';
 import {MODEL, costUsd} from '../proposer/proposer-lib.mjs';
 
 export const SYSTEM = `You improve a browser extension that fills job application forms for its user. Each week you get its learning digest:
@@ -55,16 +56,9 @@ export function issueBody(p, digest) {
     '', `_Proposed by the weekly form-learning pass (${MODEL}); a person decides._`, '', MARK(p.weaknesses.slice().sort().join('|'))].join('\n');
 }
 
-async function ask(apiKey, digest, fetcher = fetch) {
+async function ask(digest, fetcher = fetch) {
   const body = JSON.stringify({model: MODEL, max_tokens: 2000, output_config: {effort: 'low'}, system: SYSTEM, messages: [{role: 'user', content: brief(digest)}]});
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await fetcher('https://api.anthropic.com/v1/messages', {method: 'POST', body,
-      headers: {'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}});
-    if (response.ok) { const data = await response.json(); return {text: data.content?.find(block => block.type === 'text')?.text || '', usage: data.usage || {}}; }
-    if (![429, 500, 502, 503, 529].includes(response.status)) throw new Error(`Anthropic ${response.status}`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  throw new Error('Anthropic busy');
+  return askMessages(fetcher, body);
 }
 
 const gh = (...args) => execFileSync('gh', args, {encoding: 'utf8'});
@@ -89,7 +83,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const digest = await response.json();
   console.log(`digest ${digest.period.from} → ${digest.period.to}: ${digest.thisWeek.forms} forms, ${digest.weaknesses.length} weaknesses`);
   if (!digest.weaknesses.length) { console.log('Nothing ranked: no model call.'); save(); process.exit(0); }
-  const {text, usage} = await ask(process.env.ANTHROPIC_API_KEY, digest);
+  const {text, usage} = await ask(digest);
   result.usd = costUsd(usage); result.calls = 1;
   if (result.usd > budget) console.log(`::warning::one call cost $${result.usd.toFixed(4)}, above the $${budget} budget`);
   result.proposals = proposals(text, digest);

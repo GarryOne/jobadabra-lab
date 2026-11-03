@@ -4,30 +4,24 @@
 // reports start a 5% canary (the site grows or halts it from real outcomes); everything else waits as a candidate for the owner.
 // Capped at --max questions and --budget dollars a run; every decision is logged (the wording is the form's public text, never user data).
 //   node aliases/proposer.mjs --extension ../public/extension [--site URL] [--max 25] [--budget 0.3] [--dry] [--out result.json]
-// Env: LAB_KEY, ANTHROPIC_API_KEY.
+// Env: LAB_KEY, JOBADABRA_AI_BASE_URL (the AI broker relay: run behind public/desktop/e2e/broker-relay-run.mjs; no API key since 3 Nov 2026).
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {askMessages, relayUrl} from '../lib/messages.mjs';
 import {AUTO_APPROVE, BUTTON_SYSTEM, BUTTON_VERIFY, MODEL, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, buttonMessage, costUsd, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 
 const SITE = 'https://www.jobadabra.top';
 const log = (...parts) => console.log(`[aliases] ${parts.join(' ')}`);
 
-async function ask(fetcher, apiKey, system, content) {
+async function ask(fetcher, system, content) {
   // As the recipe proposer (7f6bb32): Haiku 5.5 rejects temperature (400) and thinks first, so room for that and the text block is read
   // (9 Oct 2026: every alias call failed with Anthropic 400 once the learner had targets to ask about).
   const body = JSON.stringify({model: MODEL, max_tokens: 1500, output_config: {effort: 'low'}, system, messages: [{role: 'user', content}]});
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await fetcher('https://api.anthropic.com/v1/messages', {method: 'POST', body,
-      headers: {'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}});
-    if (response.ok) { const data = await response.json(); return {text: data.content?.find(block => block.type === 'text')?.text || '', usage: data.usage || {}}; }
-    if (![429, 500, 502, 503, 529].includes(response.status)) throw new Error(`Anthropic ${response.status}`);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-  }
-  throw new Error('Anthropic busy');
+  return askMessages(fetcher, body);
 }
 
-export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3, dry = false, schema, fetcher = fetch}) {
+export async function run({site = SITE, ownerKey, max = 25, budget = 0.3, dry = false, schema, fetcher = fetch}) {
   const owner = {Authorization: `Bearer ${ownerKey}`, 'content-type': 'application/json'};
   const list = async mode => {
     const listed = await fetcher(`${site}/api/aliases?targets=${mode}`, {headers: owner});
@@ -46,34 +40,34 @@ export async function run({site = SITE, ownerKey, apiKey, max = 25, budget = 0.3
     let decision, cost = 0;
     try {
       if (kind === 'upload') {
-        const first = await ask(fetcher, apiKey, UPLOAD_SYSTEM, uploadMessage(target));
+        const first = await ask(fetcher, UPLOAD_SYSTEM, uploadMessage(target));
         cost += costUsd(first.usage);
         const proposal = parseJson(first.text);
         let verdict = null;
         if (['resume', 'cover_letter'].includes(proposal?.file)) {
-          const second = await ask(fetcher, apiKey, UPLOAD_VERIFY, uploadMessage(target, proposal.file));
+          const second = await ask(fetcher, UPLOAD_VERIFY, uploadMessage(target, proposal.file));
           cost += costUsd(second.usage);
           verdict = parseJson(second.text);
         }
         decision = decideUpload({target, proposal, verdict, validateAlias: schema.validateAlias});
       } else if (kind === 'button') {
-        const first = await ask(fetcher, apiKey, BUTTON_SYSTEM, buttonMessage(target));
+        const first = await ask(fetcher, BUTTON_SYSTEM, buttonMessage(target));
         cost += costUsd(first.usage);
         const proposal = parseJson(first.text);
         let verdict = null;
         if (proposal?.apply === true) {
-          const second = await ask(fetcher, apiKey, BUTTON_VERIFY, buttonMessage(target));
+          const second = await ask(fetcher, BUTTON_VERIFY, buttonMessage(target));
           cost += costUsd(second.usage);
           verdict = parseJson(second.text);
         }
         decision = decideButton({target, proposal, verdict, validateAlias: schema.validateAlias});
       } else {
-        const first = await ask(fetcher, apiKey, SYSTEM, askMessage(target));
+        const first = await ask(fetcher, SYSTEM, askMessage(target));
         cost += costUsd(first.usage);
         const proposal = parseJson(first.text);
         let verdict = null;
         if (proposal && !proposal.none && proposal.key) {
-          const second = await ask(fetcher, apiKey, VERIFY, verifyMessage(target, proposal.key));
+          const second = await ask(fetcher, VERIFY, verifyMessage(target, proposal.key));
           cost += costUsd(second.usage);
           verdict = parseJson(second.text);
         }
@@ -106,9 +100,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const dir = option('extension');
   if (!dir || !fs.existsSync(path.join(dir, 'alias-schema.js'))) { console.error('Pass --extension <the public repo\'s extension/ folder>.'); process.exit(2); }
   const schema = await import(pathToFileURL(path.resolve(dir, 'alias-schema.js')).href);
-  const ownerKey = process.env.LAB_KEY, apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!ownerKey || !apiKey) { console.error('LAB_KEY and ANTHROPIC_API_KEY are needed.'); process.exit(2); }
-  const summary = await run({site: option('site', SITE).replace(/\/$/, ''), ownerKey, apiKey, max: Number(option('max', '25')) || 25,
+  const ownerKey = process.env.LAB_KEY;
+  if (!ownerKey) { console.error('LAB_KEY is needed.'); process.exit(2); }
+  try { relayUrl(); } catch (error) { console.error(error.message); process.exit(2); }
+  const summary = await run({site: option('site', SITE).replace(/\/$/, ''), ownerKey, max: Number(option('max', '25')) || 25,
     budget: Number(option('budget', '0.3')) || 0.3, dry: args.includes('--dry'), schema});
   if (option('out')) fs.writeFileSync(option('out'), JSON.stringify(summary, null, 2));
 }
