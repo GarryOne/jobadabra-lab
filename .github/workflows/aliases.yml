@@ -3,7 +3,10 @@ name: Alias proposer
 # model, checked by a second pass and the extension's own validator, and filed on the site. Confirmed non-sensitive meanings with enough
 # independent reports start a 5% canary (the site grows or halts it from real outcomes); the rest wait as candidates for the owner
 # (aliases/approve.mjs). Capped at --max questions and --budget dollars a run.
-# Secrets: LAB_KEY (the site's STATS_KEY), ANTHROPIC_API_KEY.
+# Secrets: LAB_KEY (the site's STATS_KEY).
+# No API key (owner, 3 Nov 2026: "We should not use API Keys at all anymore. Everything should be around the ai-broker"): the script runs behind the public repo's AI broker relay (public/desktop/e2e/broker-relay-run.mjs) on this run's OIDC token, on the Codex plan (the scheduled lane: it stops at 70% of the Codex week, web #348); a broker "no" skips the asks with an "AI skipped/failed" annotation and the next run asks again.
+# No cost report to /ai-cost (3 Nov 2026): the figures were Haiku list prices of tokens the plan pays for, and /ai-cost would have read them as Anthropic dollars.
+# Broker calls a day: two passes per question, at most --max 25 questions, so at most 60 a day (cap 60).
 on:
   schedule:
     - cron: '57 3 * * *'
@@ -13,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # the broker knows a run by its OIDC token (public/desktop/e2e/lib/broker-client.mjs)
 
 jobs:
   propose:
@@ -20,7 +24,6 @@ jobs:
     timeout-minutes: 15
     env:
       LAB_KEY: ${{ secrets.LAB_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -30,22 +33,17 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 22}
       - name: The alias proposer's own tests
-        run: node --test aliases/aliases.test.mjs
+        run: node --test aliases/aliases.test.mjs lib/messages.test.mjs
       - name: Propose meanings
         shell: bash   # -eo pipefail: a failing job behind `| tee` fails the step (default bash -e returns tee's status)
         run: |
           flags=""
           if [ "${{ github.event.inputs.dry }}" = "true" ]; then flags="--dry"; fi
-          node aliases/proposer.mjs --extension public/extension --max 25 --budget 0.3 --out aliases-result.json $flags | tee aliases.log
+          node public/desktop/e2e/broker-relay-run.mjs --job alias-proposer --cap 60 -- node aliases/proposer.mjs --extension public/extension --max 25 --budget 0.3 --out aliases-result.json $flags | tee aliases.log
       - name: Summary
         if: always()
         run: |
           { echo '### Alias proposer'; echo; echo '```'; tail -n 40 aliases.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - name: Report the AI cost to /ai-cost
-        if: always()
-        env:
-          AI_COST_PUBLISH_KEY: ${{ secrets.AI_COST_PUBLISH_KEY }}
-        run: node public/desktop/e2e/ai-cost-report.mjs --job alias-proposer --file aliases-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: aliases-result, path: aliases-result.json, retention-days: 14, if-no-files-found: ignore}

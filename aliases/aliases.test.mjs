@@ -8,6 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {AUTO_MIN_INSTALLS, AUTO_APPROVE, setAutoApprove, BUTTON_SYSTEM, costUsd, BUTTON_VERIFY, SYSTEM, UPLOAD_SYSTEM, UPLOAD_VERIFY, VERIFY, askMessage, decide, decideButton, decideUpload, parseJson, uploadMessage, verifyMessage} from './aliases-lib.mjs';
 import {decide as approve} from './approve.mjs';
 import {run} from './proposer.mjs';
+process.env.JOBADABRA_AI_BASE_URL = 'http://relay.test';   // the AI broker relay's address (lib/messages.mjs); the fake network answers it, no key exists
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const dir = [process.env.EXTENSION_DIR, path.join(here, '../public/extension'), path.join(os.homedir(), 'jobadabra/extension')].find(item => item && fs.existsSync(path.join(item, 'alias-schema.js')));
@@ -68,7 +69,7 @@ function network(replies, targets, buttonTargets = [], fixTargets = [], uploadTa
 test('a run files the confirmed meaning as a canary and the sensitive one as a candidate, two model passes each', async () => {
   const replies = [JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}', JSON.stringify({key: 'birth_date', phrase: 'née le'}), '{"yes": true}'];
   const {fetcher, calls} = network(replies, [target({label: 'ville de résidence', installs: 7}), target({label: 'née le', installs: 9})]);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', schema, fetcher});
+  const summary = await run({ownerKey: 'k', schema, fetcher});
   assert.deepEqual([summary.canary, summary.candidate, summary.skipped, calls.model], [1, 1, 0, 4]);
   assert.deepEqual(calls.put.map(p => [p.items[0].phrase, p.status, p.source]), [['ville', 'canary', 'proposer'], ['née le', 'candidate', 'proposer']]);
   assert.ok(summary.spent > 0 && summary.spent < 0.01);
@@ -77,15 +78,15 @@ test('a run files the confirmed meaning as a canary and the sensitive one as a c
 test('a dry run files nothing, the budget stops a run, a model error skips instead of crashing', async () => {
   const many = Array.from({length: 6}, (_, i) => target({label: `ville de résidence ${i}`.replace(/\d/, 'x')}));
   const dry = network([JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}'], many);
-  await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: dry.fetcher, dry: true});
+  await run({ownerKey: 'k', schema, fetcher: dry.fetcher, dry: true});
   assert.equal(dry.calls.put.length, 0);
   const capped = network([JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}'], many);
   // The budget is two targets' worth at the model's own price (9 Oct 2026: a fixed $0.0008 stopped nothing once the learners moved to a
   // model ten times cheaper, and the scheduled run failed on this test).
   const perCall = costUsd({input_tokens: 600, output_tokens: 30});
-  assert.ok((await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: capped.fetcher, budget: perCall * 2 * 2})).considered < 6);
+  assert.ok((await run({ownerKey: 'k', schema, fetcher: capped.fetcher, budget: perCall * 2 * 2})).considered < 6);
   const broken = async url => (url.includes('targets') ? {ok: true, json: async () => ({targets: [target()], sensitive: SENSITIVE})} : {ok: false, status: 400});
-  assert.match((await run({ownerKey: 'k', apiKey: 'a', schema, fetcher: broken})).results[0].why, /error: Anthropic 400/);
+  assert.match((await run({ownerKey: 'k', schema, fetcher: broken})).results[0].why, /error: AI broker 400/);
 });
 
 test('the owner starts a candidate\'s canary; a sensitive one needs --approve', async () => {
@@ -123,7 +124,7 @@ test('the button prompts name what is not an apply button and treat the text as 
 test('a run handles questions and buttons together, files the meaning and records what meant nothing so it is not asked again', async () => {
   const replies = [JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}', '{"apply": true}', '{"yes": true}', '{"apply": false}'];
   const {fetcher, calls} = network(replies, [target({label: 'ville de résidence', installs: 7})], [btn(), btn({label: 'search jobs'})]);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', schema, fetcher});
+  const summary = await run({ownerKey: 'k', schema, fetcher});
   assert.deepEqual([summary.canary, summary.skipped, summary.results.map(r => r.kind)], [2, 1, ['question', 'button', 'button']]);
   const filed = calls.put.filter(p => p.items);
   assert.deepEqual(filed.map(p => [p.items[0].key, p.status]), [['location', 'canary'], ['apply_button', 'canary']]);
@@ -134,7 +135,7 @@ test('an answer people keep changing is filed only as a candidate, and skipped w
   const replies = [JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}', JSON.stringify({key: 'location', phrase: 'ville'}), '{"yes": true}'];
   const fixes = [target({label: 'ville de résidence', n: 30, corrected: 14, current: ''}), target({label: 'ville de résidence', n: 30, corrected: 14, current: 'location'})];
   const {fetcher, calls} = network(replies, [], [], fixes);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', schema, fetcher});
+  const summary = await run({ownerKey: 'k', schema, fetcher});
   assert.deepEqual([summary.canary, summary.candidate, summary.skipped], [0, 1, 1]);
   assert.match(calls.put[0].note, /14 of 30 fills were changed by hand/);
   assert.equal(calls.put[0].status, 'candidate');
@@ -145,7 +146,7 @@ test('an upload slot title nobody could place gets the file it asks for, verifie
   assert.deepEqual(JSON.parse(uploadMessage({label: 'dossier principal'}, 'resume')), {slot_title: 'dossier principal', claimed_file: 'resume'});
   const replies = ['{"file": "resume"}', '{"yes": true}', '{"file": "other"}'];
   const {fetcher, calls} = network(replies, [], [], [], [target({label: 'dossier principal', installs: 7}), target({label: 'pièces annexes', installs: 7})]);
-  const summary = await run({ownerKey: 'k', apiKey: 'a', schema, fetcher});
+  const summary = await run({ownerKey: 'k', schema, fetcher});
   assert.deepEqual([summary.canary, summary.skipped, summary.results.map(r => r.kind)], [1, 1, ['upload', 'upload']]);
   const filed = calls.put.filter(p => p.items);
   assert.deepEqual(filed.map(p => [p.items[0].key, p.items[0].phrase, p.status]), [['resume', 'dossier principal', 'canary']]);
@@ -158,14 +159,14 @@ test('an upload slot title nobody could place gets the file it asks for, verifie
 test('the request has no temperature and room to think; the text block is read even after a thinking block', async () => {
   const bodies = [];
   const fetcher = async (url, init = {}) => {
-    if (url.includes('api.anthropic.com')) {
+    if (url.includes('relay.test')) {
       bodies.push(JSON.parse(init.body));
       return {ok: true, status: 200, json: async () => ({content: [{type: 'thinking', thinking: '…'}, {type: 'text', text: JSON.stringify({key: 'location', phrase: 'ville'})}], usage: {input_tokens: 10, output_tokens: 5}})};
     }
     if (url.includes('targets')) return {ok: true, status: 200, json: async () => ({targets: [target()], sensitive: SENSITIVE})};
     return {ok: true, status: 200, json: async () => ({})};
   };
-  await run({ownerKey: 'k', apiKey: 'a', schema, fetcher, dry: true});
+  await run({ownerKey: 'k', schema, fetcher, dry: true});
   assert.ok(bodies.length > 0);
   assert.equal(bodies[0].temperature, undefined);
   assert.ok(bodies[0].max_tokens >= 1000);
