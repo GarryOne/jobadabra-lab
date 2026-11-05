@@ -115,8 +115,8 @@ jobs:
         id: scout
         env:
           INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
-          # Why (31 Oct 2026, owner + coordinator): Codex has ~12% of its week left until 4 Nov, so a run asks at most 40 broker calls (about 2,000 items); items past it stay unjudged, never defaulted. Raise this after the 4 Nov reset.
-          CENTRAL_AI_CAP: '40'
+          # Why (5 Nov 2026, owner: "200 a run, after a fix"): a run asks at most 200 broker calls (about 10,000 items), which sorts the employers still without a kind in about 6 days; items past it stay unjudged, never defaulted. Web#448 stops these calls reaching the Claude plan past the 70% line, so this cap is no longer the only brake.
+          CENTRAL_AI_CAP: '200'
           BATCH: ${{ inputs.batch || '500' }}
           SCOUT_TITLE_KINDS: ops/config/title_kinds.json.gz   # titles judged on the owner's Claude plan (tools/recount_title_kinds.py); absent: nothing changes
           SCOUT_BOARD_COUNTRY: ${{ inputs.country }}
