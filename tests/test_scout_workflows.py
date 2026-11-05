@@ -58,7 +58,8 @@ class CentralScout(unittest.TestCase):
         self.assertIn('workflow_dispatch:', self.code)
 
     def test_the_scout_keeps_its_places_between_runs(self):
-        self.assertEqual(self.text.count('data/geo.json'), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite'),
+        # Why (5 Nov 2026, jobadabra#2915): a comment after a path in a `path: |` block is part of the path, so the places were never kept; the line must be the path alone.
+        self.assertEqual(len(re.findall(r'(?m)^\s*data/geo\.json$', self.text)), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite'),
                          'every cache restore and save keeps the places the AI judged (asked once, ever)')
 
     def test_its_ai_runs_behind_the_broker_relay_on_the_40_call_cap(self):
