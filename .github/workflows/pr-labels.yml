@@ -11,7 +11,7 @@
 # so a fix to a parser lands in every repo at once. Scripts and cases: tools/conflict-label.mjs, tools/gitar-label.mjs there.
 name: CI · PR labels
 # Why (30 Oct 2026): quoted, since an unquoted ' #' starts a YAML comment, which cut the number off every run's name.
-run-name: "${{ github.event_name == 'push' && 'PR labels after a push to main' || format('PR labels on #{0}', github.event.pull_request.number || github.event.issue.number) }}"
+run-name: "${{ github.event_name == 'push' && 'PR labels after a push to main' || github.event_name == 'check_run' && 'PR labels after a Gitar check' || format('PR labels on #{0}', github.event.pull_request.number || github.event.issue.number) }}"
 
 on:
   push:
@@ -22,6 +22,8 @@ on:
     types: [submitted, dismissed]
   issue_comment:
     types: [created]
+  check_run:   # Why (5 Nov 2026, jobadabra#3176): Gitar's verdict can arrive as an edit, which starts nothing; its check ending does. No PR row: it runs on main.
+    types: [created, completed]
 
 permissions:
   contents: read
@@ -42,7 +44,8 @@ jobs:
       github.event_name == 'push' ||
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'pull_request_review' && github.event.review.user.login == 'gitar-bot[bot]') ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'gitar-bot[bot]')
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.user.login == 'gitar-bot[bot]') ||
+      (github.event_name == 'check_run' && github.event.check_run.app.slug == 'gitar-bot')
     runs-on: ubuntu-24.04
     timeout-minutes: 15   # a hang guard: the two steps took 267 s at the very worst, queue included, in the last 30 runs of each
     steps:
