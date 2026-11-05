@@ -59,8 +59,13 @@ class CentralScout(unittest.TestCase):
 
     def test_the_scout_keeps_its_places_between_runs(self):
         # Why (5 Nov 2026, jobadabra#2915): a comment after a path in a `path: |` block is part of the path, so the places were never kept; the line must be the path alone.
-        self.assertEqual(len(re.findall(r'(?m)^\s*data/geo\.json$', self.text)), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite'),
+        self.assertEqual(len(re.findall(r'(?m)^\s*data/geo\.json$', self.text)), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite') - 1,   # TODO(AI): drop the - 1 with the old-list restore step (#80)
                          'every cache restore and save keeps the places the AI judged (asked once, ever)')
+
+    def test_a_changed_path_list_still_finds_the_last_cache(self):
+        # Guard: data — a cache with another path list is not found, and the empty run loses the title answers and the feed list (2 Nov 2026, 6,833 → 3,871 feeds).
+        self.assertIn("if: steps.candidates.outputs.cache-matched-key == ''", self.code)
+        self.assertEqual(self.text.count('data/geo.json   # where each job place is, judged once by the AI (src/scout_kind_counts.py)'), 1)
 
     def test_its_ai_runs_behind_the_broker_relay_on_the_40_call_cap(self):
         """Owner, 26 Oct 2026 "keep claude for the scout"; 31 Oct 2026 "We should use fully the Codex": no Anthropic key, no Free AI, no address off this machine."""

@@ -64,6 +64,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Restore the scout's candidate list
+        id: candidates
         uses: actions/cache/restore@v5
         with:
           # data/geo.json: where each job place is, judged once by the AI (src/scout_kind_counts.py).
@@ -72,6 +73,18 @@ jobs:
             data/jobs.sqlite
             data/cache
             data/geo.json
+          key: central-scout-db-${{ github.run_id }}
+          restore-keys: central-scout-db-
+      # Why (5 Nov 2026, jobadabra#2915): a cache's version is a hash of this path list, so the old list's cache is invisible to the step above; an empty cache on 2 Nov lost the title answers and 2,962 feeds.
+      # TODO(AI): remove this step once a run has saved under the new list (#80)
+      - name: Restore a cache saved under the old path list
+        if: steps.candidates.outputs.cache-matched-key == ''
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            data/jobs.sqlite
+            data/cache
+            data/geo.json   # where each job place is, judged once by the AI (src/scout_kind_counts.py)
           key: central-scout-db-${{ github.run_id }}
           restore-keys: central-scout-db-
       - name: Install the AI library and the headless browser
