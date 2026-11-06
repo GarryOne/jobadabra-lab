@@ -40,6 +40,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30   # owner, 24 Oct 2026: 30 minutes so a run reaches more of its feed slice (20 on 23 Oct); the feeds are verified in slices (src/scout_carry.py)
     env:
+      SCOUT_MEMORY_URL: https://www.jobadabra.top/api/scout-memory   # the site's private copy of the scout's memory (web#457); the key is INDEX_PUBLISH_KEY, as for the index
       PYTHONUNBUFFERED: '1'   # 22 Oct 2026: a cancelled run lost every line the scout had printed but not flushed ("no log line for 37 min")
     steps:
       - name: When this job started (the scout's deadline counts from here)
@@ -75,18 +76,33 @@ jobs:
             data/geo.json
           key: central-scout-db-${{ github.run_id }}
           restore-keys: central-scout-db-
-      # Why (5 Nov 2026, jobadabra#2915): a cache's version is a hash of this path list, so the old list's cache is invisible to the step above; an empty cache on 2 Nov lost the title answers and 2,962 feeds.
-      # TODO(AI): remove this step once a run has saved under the new list (#80)
-      - name: Restore a cache saved under the old path list
+      # Why (6 Nov 2026, owner: "Yes, copy it to R2 (Recommended)"; web#457 holds the route): the scout's memory lived only in this repo's GitHub cache, and on 2 Nov a repo move left it behind
+      # (6,833 to 3,871 feeds, the title answers lost). The site keeps a private copy (30 days); it comes back from there when the cache found nothing. The cache stays the first home.
+      # Replaces the one-time restore of the old path list (#80): run 42118339535 saved under the new list, so the cache is found again.
+      # Whatever fails here says one line and never fails the run: the scout then starts from its seed lists, as it did before.
+      - name: Restore the scout's memory from the site when the cache was not found
         if: steps.candidates.outputs.cache-matched-key == ''
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            data/jobs.sqlite
-            data/cache
-            data/geo.json   # where each job place is, judged once by the AI (src/scout_kind_counts.py)
-          key: central-scout-db-${{ github.run_id }}
-          restore-keys: central-scout-db-
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
+        run: |
+          set +e
+          if [ -z "$INDEX_PUBLISH_KEY" ]; then echo "scout memory: not restored from R2 (no INDEX_PUBLISH_KEY)"; exit 0; fi
+          zipped="$RUNNER_TEMP/scout-memory.tgz"; heads="$RUNNER_TEMP/scout-memory.head"; errs="$RUNNER_TEMP/scout-memory.err"
+          code=$(printf 'header = "Authorization: Bearer %s"\n' "$INDEX_PUBLISH_KEY" | curl -sS -K - --max-time 120 -D "$heads" -o "$zipped" -w '%{http_code}' "$SCOUT_MEMORY_URL" 2>"$errs")
+          status=$?
+          if [ "$status" != 0 ] || [ "$code" != 200 ]; then
+            echo "scout memory: not restored from R2 (HTTP ${code:-none}: $( (head -c 200 "$zipped"; head -c 200 "$errs") 2>/dev/null | tr '\n\r' '  ' ))"
+            exit 0
+          fi
+          unpacked=$(mktemp -d)
+          if tar -xzf "$zipped" -C "$unpacked" 2>/dev/null && mkdir -p data && cp -a "$unpacked"/. data/; then
+            echo "scout memory: restored from R2 $(grep -i '^x-scout-memory:' "$heads" | tr -d '\r' | cut -d' ' -f2 | cut -c1-10)"
+          else
+            echo "scout memory: not restored from R2 (the copy did not unpack)"
+          fi
+          exit 0
       - name: Install the AI library and the headless browser
         continue-on-error: true
         run: pip install --quiet -r requirements.txt -r requirements-render.txt
@@ -150,3 +166,28 @@ jobs:
             data/cache
             data/geo.json
           key: central-scout-db-${{ github.run_id }}
+      # Why (6 Nov 2026, owner: "Yes, copy it to R2 (Recommended)"): the same three things the cache keeps, as one gzipped tar, after every run and also when a later step failed, as the cache save does.
+      # The site refuses a save under half its newest copy (a scout that started empty must not replace a good memory) and drops copies older than 30 days; a refusal says one line here and never fails the run.
+      - name: Save the scout's memory to the site
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}
+        run: |
+          set +e
+          if [ -z "$INDEX_PUBLISH_KEY" ]; then echo "scout memory: not saved to R2 (no INDEX_PUBLISH_KEY)"; exit 0; fi
+          keep=()
+          for name in jobs.sqlite cache geo.json; do [ -e "data/$name" ] && keep+=("$name"); done
+          if [ "${#keep[@]}" = 0 ]; then echo "scout memory: not saved to R2 (no data folder)"; exit 0; fi
+          zipped="$RUNNER_TEMP/scout-memory-save.tgz"; answer="$RUNNER_TEMP/scout-memory-save.answer"; errs="$RUNNER_TEMP/scout-memory-save.err"
+          if ! tar -czf "$zipped" -C data "${keep[@]}"; then echo "scout memory: not saved to R2 (the tar failed)"; exit 0; fi
+          bytes=$(wc -c < "$zipped" | tr -d ' ')
+          code=$(printf 'header = "Authorization: Bearer %s"\n' "$INDEX_PUBLISH_KEY" | curl -sS -K - --max-time 120 -T "$zipped" -H 'Content-Type: application/gzip' -o "$answer" -w '%{http_code}' "$SCOUT_MEMORY_URL?run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" 2>"$errs")
+          status=$?
+          if [ "$status" = 0 ] && [ "$code" = 200 ]; then
+            echo "scout memory: saved to R2 $bytes bytes"
+          else
+            echo "scout memory: not saved to R2 (HTTP ${code:-none}: $( (head -c 200 "$answer"; head -c 200 "$errs") 2>/dev/null | tr '\n\r' '  ' ))"
+          fi
+          exit 0
