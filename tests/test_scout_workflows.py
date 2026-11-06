@@ -1,8 +1,15 @@
 """The central scout's and the product brain's workflows, which moved here from the public repo (1 Nov 2026, rs 6b/6; owner: "jobadabra should have no web, no worker").
 The wiring tests that read their text moved with them, so the public repo has no server workflow to read. The engine side of each assertion
 (scout_core's budgets, the relay, the brain's Codex step) stays tested in the public repo; JOBADABRA_PUBLIC points at its checkout."""
+import http.server
+import io
 import os
 import re
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -23,6 +30,71 @@ def budget_seconds(name):
     match = re.search(r'(?m)^%s\s*=\s*(\d+)\s*\*\s*(\d+)' % name, (ENGINE / 'src' / 'scout_core.py').read_text(encoding='utf-8'))
     assert match, f'{name} is no longer "N * M" in src/scout_core.py: update budget_seconds'
     return int(match.group(1)) * int(match.group(2))
+
+
+def step(text, title):
+    """-> the text of the workflow step named `title`, up to the next step."""
+    match = re.search(r'(?ms)^      - name: %s\n.*?(?=^      - |\Z)' % re.escape(title), text)
+    assert match, f'no step named "{title}"'
+    return match.group(0)
+
+
+def script_of(step_text):
+    """-> the dedented `run: |` block of a step, as the runner writes it to a file."""
+    lines = step_text.splitlines()
+    start = next(i for i, line in enumerate(lines) if re.match(r'\s+run: \|\s*$', line))
+    indent = len(lines[start]) - len(lines[start].lstrip()) + 2
+    body = []
+    for line in lines[start + 1:]:
+        if line.strip() and len(line) - len(line.lstrip()) < indent:
+            break
+        body.append(line[indent:])
+    return '\n'.join(body) + '\n'
+
+
+def memory_tar():
+    """-> a gzipped tar of the three things the scout keeps, as the site would hand it back."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode='w:gz') as tar:
+        for name, data in {'jobs.sqlite': b'sqlite', 'cache/a.json': b'{"a":1}', 'geo.json': b'{"Zurich":[47,8]}'}.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+class FakeSite:
+    """The site's /api/scout-memory as far as a workflow step can tell: it answers what it is told and records what it was asked."""
+
+    def __init__(self):
+        self.status, self.body, self.headers, self.requests = 200, b'', {}, []
+        self.queue, self.short = [], 0   # answers to give first, one each; bytes the Content-Length promises and the body never delivers
+        site = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def answer(self):
+                length = int(self.headers.get('Content-Length') or 0)
+                site.requests.append({'method': self.command, 'path': self.path, 'auth': self.headers.get('Authorization'), 'body': self.rfile.read(length) if length else b''})
+                status, body, headers = site.queue.pop(0) if site.queue else (site.status, site.body, site.headers)
+                self.send_response(status)
+                for name, value in headers.items():
+                    self.send_header(name, value)
+                self.send_header('Content-Length', str(len(body) + site.short))
+                self.end_headers()
+                self.wfile.write(body)
+
+            do_GET = do_PUT = answer
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.url = f'http://127.0.0.1:{self.server.server_port}/api/scout-memory'
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
 
 
 class EveryWorkflowIsValidYaml(unittest.TestCase):
@@ -59,13 +131,13 @@ class CentralScout(unittest.TestCase):
 
     def test_the_scout_keeps_its_places_between_runs(self):
         # Why (5 Nov 2026, jobadabra#2915): a comment after a path in a `path: |` block is part of the path, so the places were never kept; the line must be the path alone.
-        self.assertEqual(len(re.findall(r'(?m)^\s*data/geo\.json$', self.text)), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite') - 1,   # TODO(AI): drop the - 1 with the old-list restore step (#80)
+        self.assertEqual(len(re.findall(r'(?m)^\s*data/geo\.json$', self.text)), self.text.count('data/jobs.sqlite') - self.text.count('--db data/jobs.sqlite'),
                          'every cache restore and save keeps the places the AI judged (asked once, ever)')
 
-    def test_a_changed_path_list_still_finds_the_last_cache(self):
-        # Guard: data — a cache with another path list is not found, and the empty run loses the title answers and the feed list (2 Nov 2026, 6,833 → 3,871 feeds).
-        self.assertIn("if: steps.candidates.outputs.cache-matched-key == ''", self.code)
-        self.assertEqual(self.text.count('data/geo.json   # where each job place is, judged once by the AI (src/scout_kind_counts.py)'), 1)
+    def test_the_one_time_restore_of_the_old_path_list_is_gone(self):
+        # Why (6 Nov 2026): #80 added it for the first run after the path list changed; run 42118339535 saved under the new list, so the cache is found again and the site's copy covers a lost one.
+        self.assertNotIn('Restore a cache saved under the old path list', self.text)
+        self.assertNotIn('data/geo.json   # where each job place is', self.text)
 
     def test_its_ai_runs_behind_the_broker_relay_on_the_200_call_cap(self):
         """Owner, 26 Oct 2026 "keep claude for the scout"; 31 Oct 2026 "We should use fully the Codex": no Anthropic key, no Free AI, no address off this machine."""
@@ -89,6 +161,127 @@ class CentralScout(unittest.TestCase):
         limit = int(re.search(r'timeout-minutes: (\d+)', self.text).group(1))
         setup, reserve = 6, 3   # minutes: checkout, installs, Common Crawl (3 min cap) before the scout; upload and cost report after
         self.assertLessEqual(setup + (budget_seconds('CENTRAL_BUDGET_S') + budget_seconds('VERIFY_BUDGET_S')) / 60 + reserve, limit)
+
+
+class ScoutMemoryOnTheSite(unittest.TestCase):
+    """Owner, 6 Nov 2026: "Yes, copy it to R2 (Recommended)". The scout's memory (jobs.sqlite, cache, geo.json) lived only in this repo's GitHub cache; on 2 Nov a repo move left it behind
+    (6,833 → 3,871 feeds, the title answers lost). The site keeps a private copy (web#457, /api/scout-memory): it comes back when no cache is found, and every run saves it. These tests play the
+    two steps' own scripts against a fake site, so what they prove is what the runner runs: a failed read or save says one line and never fails the run."""
+    RESTORE = "Restore the scout's memory from the site when the cache was not found"
+    SAVE = "Save the scout's memory to the site"
+
+    def setUp(self):
+        self.text = (WORKFLOWS / 'central-scout.yml').read_text(encoding='utf-8')
+        self.site = FakeSite()
+        self.addCleanup(self.site.close)
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = Path(self.dir.name)
+        self.workspace = self.root / 'workspace'
+        self.workspace.mkdir()
+        (self.root / 'temp').mkdir()
+
+    def run_step(self, title, key='the-key', url=None):
+        """Runs the step's script the way the runner does (bash -e, its environment) and -> its output; it must always exit 0."""
+        script = self.root / 'step.sh'
+        script.write_text(script_of(step(self.text, title)))
+        env = {'PATH': os.environ['PATH'], 'HOME': str(self.root), 'RUNNER_TEMP': str(self.root / 'temp'), 'GITHUB_RUN_ID': '42118339535', 'GITHUB_RUN_ATTEMPT': '1',
+               'SCOUT_MEMORY_URL': url or self.site.url, 'INDEX_PUBLISH_KEY': key}
+        done = subprocess.run(['bash', '-e', str(script)], cwd=self.workspace, env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        if key:
+            self.assertNotIn(key, done.stdout + done.stderr, 'the key is never printed')
+        return done.stdout.strip()
+
+    def make_data(self):
+        data = self.workspace / 'data'
+        (data / 'cache').mkdir(parents=True)
+        (data / 'jobs.sqlite').write_bytes(b'sqlite')
+        (data / 'cache' / 'a.json').write_bytes(b'{"a":1}')
+        (data / 'geo.json').write_bytes(b'{}')
+
+    def test_the_steps_sit_around_the_scout_and_only_the_site_copy_needs_the_key(self):
+        order = re.findall(r'(?m)^      - name: (.*)$', self.text)
+        self.assertLess(order.index("Restore the scout's candidate list"), order.index(self.RESTORE))
+        self.assertLess(order.index(self.RESTORE), order.index('Scout and publish the index'))
+        self.assertLess(order.index('Scout and publish the index'), order.index(self.SAVE))
+        restore, save = step(self.text, self.RESTORE), step(self.text, self.SAVE)
+        self.assertIn("if: steps.candidates.outputs.cache-matched-key == ''", restore, 'the cache stays the first home: the site is asked only when it found nothing')
+        self.assertIn('if: always()', save, 'a run that fails later still saves what it learned, as the cache save does')
+        self.assertIn('SCOUT_MEMORY_URL: https://www.jobadabra.top/api/scout-memory', self.text)
+        for text in (restore, save):
+            self.assertIn('INDEX_PUBLISH_KEY: ${{ secrets.INDEX_PUBLISH_KEY }}', text)
+            self.assertIn('continue-on-error: true', text, 'whatever fails here never fails the run')
+            self.assertNotRegex(script_of(text), r'secrets\.|\$\{\{', 'the key reaches curl from the environment, never written into the script')
+
+    def test_with_no_cache_the_memory_comes_back_from_the_site(self):
+        self.site.body, self.site.headers = memory_tar(), {'X-Scout-Memory': '2026-11-05-42118339535-1'}
+        self.assertEqual(self.run_step(self.RESTORE), 'scout memory: restored from R2 2026-11-05')
+        data = self.workspace / 'data'
+        self.assertEqual((data / 'jobs.sqlite').read_bytes(), b'sqlite')
+        self.assertEqual((data / 'cache' / 'a.json').read_bytes(), b'{"a":1}')
+        self.assertEqual((data / 'geo.json').read_bytes(), b'{"Zurich":[47,8]}')
+        self.assertEqual([(r['method'], r['path'], r['auth']) for r in self.site.requests], [('GET', '/api/scout-memory', 'Bearer the-key')])
+
+    def test_a_failed_read_says_one_line_with_the_answer_and_never_fails_the_run(self):
+        warn = '::warning::'   # a run warning, so a rotated key does not hide in a green line; an empty bucket (the normal first run) is no warning
+        cases = [(404, b'{"ok":false,"error":"none saved"}', '', 'HTTP 404: {"ok":false,"error":"none saved"}', 1),   # an empty bucket: asked once, not retried
+                 (404, b'Not found', warn, 'HTTP 404: Not found', 1),   # a wrong or rotated key reads differently from "nothing saved"
+                 (503, b'{"ok":false,"error":"not configured"}', warn, 'HTTP 503', 3),   # a busy site is asked three times
+                 (200, b'this is not a tar', warn, 'the copy did not unpack', 1)]
+        for status, body, mark, wanted, asked in cases:
+            with self.subTest(status=status, body=body):
+                self.site.status, self.site.body = status, body
+                self.site.requests.clear()
+                out = self.run_step(self.RESTORE)
+                self.assertEqual(len(out.splitlines()), 1, out)
+                self.assertTrue(out.startswith(f'{mark}scout memory: not restored from R2 ('), out)
+                self.assertIn(wanted, out)
+                self.assertEqual(len(self.site.requests), asked)
+                self.assertFalse((self.workspace / 'data').exists(), 'nothing half-restored is left behind')
+        out = self.run_step(self.RESTORE, url='http://127.0.0.1:1/api/scout-memory')
+        self.assertTrue(out.startswith(f'{warn}scout memory: not restored from R2 ('), out)
+        self.assertIn('HTTP 000', out, 'the site unreachable')
+        self.site.requests.clear()
+        self.assertEqual(self.run_step(self.RESTORE, key=''), f'{warn}scout memory: not restored from R2 (no INDEX_PUBLISH_KEY)')
+        self.assertEqual(self.site.requests, [])
+
+    def test_one_blip_does_not_start_the_scout_empty(self):
+        # Why (6 Nov 2026, review): the empty start is cached by the run, so later runs find a cache and never ask the site again; the read is tried three times.
+        self.site.queue = [(503, b'busy', {}), (502, b'bad gateway', {})]
+        self.site.body, self.site.headers = memory_tar(), {'X-Scout-Memory': '2026-11-05-42118339535-1'}
+        self.assertEqual(self.run_step(self.RESTORE), 'scout memory: restored from R2 2026-11-05')
+        self.assertEqual(len(self.site.requests), 3)
+
+    def test_a_read_that_breaks_after_the_status_never_prints_the_memory_into_the_public_log(self):
+        self.site.body, self.site.short = b'PRIVATE-MEMORY-BYTES' * 20, 100   # promises 100 more bytes than it sends: curl fails with a 200 already read
+        out = self.run_step(self.RESTORE)
+        self.assertTrue(out.startswith('::warning::scout memory: not restored from R2 (HTTP 200: curl exit '), out)
+        self.assertNotIn('PRIVATE-MEMORY', out)
+
+    def test_every_run_saves_what_the_cache_keeps(self):
+        self.make_data()
+        self.site.body = b'{"ok":true,"key":"2026-11-06-42118339535-1","bytes":1,"dropped":0}'
+        out = self.run_step(self.SAVE)
+        [request] = self.site.requests
+        self.assertEqual((request['method'], request['path'], request['auth']), ('PUT', '/api/scout-memory?run=42118339535-1', 'Bearer the-key'))
+        self.assertEqual(out, f"scout memory: saved to R2 {len(request['body'])} bytes")
+        with tarfile.open(fileobj=io.BytesIO(request['body']), mode='r:gz') as tar:
+            self.assertLessEqual({'jobs.sqlite', 'cache/a.json', 'geo.json'}, set(tar.getnames()))
+            self.assertEqual(tar.extractfile('geo.json').read(), b'{}')
+
+    def test_a_refused_or_failed_save_says_one_line_and_never_fails_the_run(self):
+        self.make_data()
+        self.site.status, self.site.body = 409, b'{"ok":false,"error":"4999 bytes would replace 10000"}'
+        out = self.run_step(self.SAVE)
+        self.assertEqual(out, '::warning::scout memory: not saved to R2 (HTTP 409: {"ok":false,"error":"4999 bytes would replace 10000"})')   # an empty start: the one a person should see
+        out = self.run_step(self.SAVE, url='http://127.0.0.1:1/api/scout-memory')
+        self.assertTrue(out.startswith('::warning::scout memory: not saved to R2 (HTTP 000'), out)
+        self.site.requests.clear()
+        self.assertEqual(self.run_step(self.SAVE, key=''), '::warning::scout memory: not saved to R2 (no INDEX_PUBLISH_KEY)')
+        shutil.rmtree(self.workspace / 'data')
+        self.assertEqual(self.run_step(self.SAVE), 'scout memory: not saved to R2 (no data folder)')
+        self.assertEqual(self.site.requests, [], 'nothing was sent without a key or without data')
 
 
 class ProductBrain(unittest.TestCase):
