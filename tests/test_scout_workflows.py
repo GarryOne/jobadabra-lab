@@ -68,18 +68,20 @@ class FakeSite:
 
     def __init__(self):
         self.status, self.body, self.headers, self.requests = 200, b'', {}, []
+        self.queue, self.short = [], 0   # answers to give first, one each; bytes the Content-Length promises and the body never delivers
         site = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def answer(self):
                 length = int(self.headers.get('Content-Length') or 0)
                 site.requests.append({'method': self.command, 'path': self.path, 'auth': self.headers.get('Authorization'), 'body': self.rfile.read(length) if length else b''})
-                self.send_response(site.status)
-                for name, value in site.headers.items():
+                status, body, headers = site.queue.pop(0) if site.queue else (site.status, site.body, site.headers)
+                self.send_response(status)
+                for name, value in headers.items():
                     self.send_header(name, value)
-                self.send_header('Content-Length', str(len(site.body)))
+                self.send_header('Content-Length', str(len(body) + site.short))
                 self.end_headers()
-                self.wfile.write(site.body)
+                self.wfile.write(body)
 
             do_GET = do_PUT = answer
 
@@ -222,22 +224,40 @@ class ScoutMemoryOnTheSite(unittest.TestCase):
         self.assertEqual([(r['method'], r['path'], r['auth']) for r in self.site.requests], [('GET', '/api/scout-memory', 'Bearer the-key')])
 
     def test_a_failed_read_says_one_line_with_the_answer_and_never_fails_the_run(self):
-        cases = [(404, b'{"ok":false,"error":"none saved"}', 'HTTP 404: {"ok":false,"error":"none saved"}'),   # an empty bucket
-                 (404, b'Not found', 'HTTP 404: Not found'),   # a wrong or rotated key reads differently from "nothing saved"
-                 (503, b'{"ok":false,"error":"not configured"}', 'HTTP 503'),
-                 (200, b'this is not a tar', 'the copy did not unpack')]
-        for status, body, wanted in cases:
+        warn = '::warning::'   # a run warning, so a rotated key does not hide in a green line; an empty bucket (the normal first run) is no warning
+        cases = [(404, b'{"ok":false,"error":"none saved"}', '', 'HTTP 404: {"ok":false,"error":"none saved"}', 1),   # an empty bucket: asked once, not retried
+                 (404, b'Not found', warn, 'HTTP 404: Not found', 1),   # a wrong or rotated key reads differently from "nothing saved"
+                 (503, b'{"ok":false,"error":"not configured"}', warn, 'HTTP 503', 3),   # a busy site is asked three times
+                 (200, b'this is not a tar', warn, 'the copy did not unpack', 1)]
+        for status, body, mark, wanted, asked in cases:
             with self.subTest(status=status, body=body):
                 self.site.status, self.site.body = status, body
+                self.site.requests.clear()
                 out = self.run_step(self.RESTORE)
                 self.assertEqual(len(out.splitlines()), 1, out)
-                self.assertTrue(out.startswith('scout memory: not restored from R2 ('), out)
+                self.assertTrue(out.startswith(f'{mark}scout memory: not restored from R2 ('), out)
                 self.assertIn(wanted, out)
+                self.assertEqual(len(self.site.requests), asked)
                 self.assertFalse((self.workspace / 'data').exists(), 'nothing half-restored is left behind')
-        self.assertIn('HTTP 000', self.run_step(self.RESTORE, url='http://127.0.0.1:1/api/scout-memory'), 'the site unreachable')
+        out = self.run_step(self.RESTORE, url='http://127.0.0.1:1/api/scout-memory')
+        self.assertTrue(out.startswith(f'{warn}scout memory: not restored from R2 ('), out)
+        self.assertIn('HTTP 000', out, 'the site unreachable')
         self.site.requests.clear()
-        self.assertEqual(self.run_step(self.RESTORE, key=''), 'scout memory: not restored from R2 (no INDEX_PUBLISH_KEY)')
+        self.assertEqual(self.run_step(self.RESTORE, key=''), f'{warn}scout memory: not restored from R2 (no INDEX_PUBLISH_KEY)')
         self.assertEqual(self.site.requests, [])
+
+    def test_one_blip_does_not_start_the_scout_empty(self):
+        # Why (6 Nov 2026, review): the empty start is cached by the run, so later runs find a cache and never ask the site again; the read is tried three times.
+        self.site.queue = [(503, b'busy', {}), (502, b'bad gateway', {})]
+        self.site.body, self.site.headers = memory_tar(), {'X-Scout-Memory': '2026-11-05-42118339535-1'}
+        self.assertEqual(self.run_step(self.RESTORE), 'scout memory: restored from R2 2026-11-05')
+        self.assertEqual(len(self.site.requests), 3)
+
+    def test_a_read_that_breaks_after_the_status_never_prints_the_memory_into_the_public_log(self):
+        self.site.body, self.site.short = b'PRIVATE-MEMORY-BYTES' * 20, 100   # promises 100 more bytes than it sends: curl fails with a 200 already read
+        out = self.run_step(self.RESTORE)
+        self.assertTrue(out.startswith('::warning::scout memory: not restored from R2 (HTTP 200: curl exit '), out)
+        self.assertNotIn('PRIVATE-MEMORY', out)
 
     def test_every_run_saves_what_the_cache_keeps(self):
         self.make_data()
@@ -254,10 +274,11 @@ class ScoutMemoryOnTheSite(unittest.TestCase):
         self.make_data()
         self.site.status, self.site.body = 409, b'{"ok":false,"error":"4999 bytes would replace 10000"}'
         out = self.run_step(self.SAVE)
-        self.assertEqual(out, 'scout memory: not saved to R2 (HTTP 409: {"ok":false,"error":"4999 bytes would replace 10000"})')
-        self.assertIn('HTTP 000', self.run_step(self.SAVE, url='http://127.0.0.1:1/api/scout-memory'))
+        self.assertEqual(out, '::warning::scout memory: not saved to R2 (HTTP 409: {"ok":false,"error":"4999 bytes would replace 10000"})')   # an empty start: the one a person should see
+        out = self.run_step(self.SAVE, url='http://127.0.0.1:1/api/scout-memory')
+        self.assertTrue(out.startswith('::warning::scout memory: not saved to R2 (HTTP 000'), out)
         self.site.requests.clear()
-        self.assertEqual(self.run_step(self.SAVE, key=''), 'scout memory: not saved to R2 (no INDEX_PUBLISH_KEY)')
+        self.assertEqual(self.run_step(self.SAVE, key=''), '::warning::scout memory: not saved to R2 (no INDEX_PUBLISH_KEY)')
         shutil.rmtree(self.workspace / 'data')
         self.assertEqual(self.run_step(self.SAVE), 'scout memory: not saved to R2 (no data folder)')
         self.assertEqual(self.site.requests, [], 'nothing was sent without a key or without data')
